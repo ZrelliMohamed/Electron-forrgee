@@ -1,15 +1,23 @@
 import React, { useState, useEffect,useRef } from 'react';
 import GetClient from '../Helper/FactureHelper/GetClient';
 import FacArticles from '../Helper/FactureHelper/FacArticles';
-
+import img from '../../assets/Zim.jpg'
 import FacPrinter from '../Helper/FactureHelper/FacPrinter';
+import axios from 'axios';
 
 function Facture() {
   const [articles, setArticles] = useState([]);
   const [client, setClient] = useState({});
+  const [nextFactureNumber, setNfN] = useState('');
 
 
-
+  const getNextFactureNumber = async() =>{
+    const {data} = await axios.get('http://localhost:443/factures/next')
+    setNfN(data.nextFactureNumber)
+  }
+  useEffect(() => {
+    getNextFactureNumber()
+  }, []);
   // Function to convert number into French words
   function numberToWords(number) {
     const units = ['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf'];
@@ -95,10 +103,9 @@ function Facture() {
 
 
   useEffect(() => {
-    console.log('1',articles);
-    console.log(client);
     calculateInvoiceData();
-  }, [articles,client]);
+
+  }, [articles]);
 
   const [date, setDate] = useState(getFormattedDate());
 
@@ -158,11 +165,33 @@ function Facture() {
   const netAPayerInFrench = numberToWords(parseFloat(invoiceData.netAPayer));
   return (
     <div>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <thead>
+        <tr>
+          <th style={{ width: '25%', padding: '10px', textAlign: 'center' }}></th>
+          <th style={{ width: '35%', padding: '10px', textAlign: 'center' }}></th>
+          <th style={{ width: '20%', padding: '10px', textAlign: 'center' }}></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
+            <img src={img} alt="Company Logo" style={{ maxWidth: '130px', maxHeight: '100%' }} />
+          </td>
+          <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
+            <span style={{ fontSize: '24px'}}> {`Facture N°${nextFactureNumber}`}</span>
+          </td>
+          <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}></td>
+        </tr>
+      </tbody>
+    </table>
 
-
-        <div>
+        <div style={{marginTop:'20px'}}>
           <GetClient setClt={setClient} />
         </div>
+      {client.referance !==undefined &&
+        <>
+
         <div>
           <table width="100%">
             <tbody>
@@ -224,7 +253,10 @@ function Facture() {
             </tbody>
           </table>
         </div>
-        <FacPrinter articles={articles} client={client} date={date} invoiceData={invoiceData} netAPayerInFrench={netAPayerInFrench}/>
+        <FacPrinter articles={articles} client={client} date={date} invoiceData={invoiceData} netAPayerInFrench={netAPayerInFrench} Nbc={0} nextFactureNumber={nextFactureNumber}/>
+
+        </>
+      }
 
     </div>
   );

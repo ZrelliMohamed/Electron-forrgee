@@ -35,6 +35,16 @@ function GetClient({setClt}) {
     } catch (error) {
       console.log('this',error.response.data );
       setErrorMessage(error.response.data.message);
+      setClient({
+        reference: '',
+        name: '',
+        matFisc: '',
+        telephone: '',
+        fax: '',
+        address: '',
+        email: '',
+      })
+      setClt({})
     }
   };
 
