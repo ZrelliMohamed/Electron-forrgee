@@ -1,18 +1,36 @@
-import React, { useState, useEffect,useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import GetClient from '../Helper/FactureHelper/GetClient';
 import FacArticles from '../Helper/FactureHelper/FacArticles';
 import img from '../../assets/Zim.jpg'
-import FacPrinter from '../Helper/FactureHelper/FacPrinter';
 import axios from 'axios';
-
+import { useNavigate } from 'react-router-dom';
 function Facture() {
   const [articles, setArticles] = useState([]);
   const [client, setClient] = useState({});
   const [nextFactureNumber, setNfN] = useState('');
+  const navigate = useNavigate()
+  const [setting, setSetting] = useState({
+    Tva: 0,
+    fodec: 0,
+    timbreFiscal: 0,
+});
+
+const fetchData = async () => {
+  try {
+      const response = await axios.get('http://localhost:443/setting');
+      const { Tva, fodec, timbreFiscal } = response.data.document;
+      setSetting({ Tva, fodec, timbreFiscal });
+  } catch (error) {
+      setError('Error fetching data: ' + error.message);
+  }
+};
+useEffect(() => {
+  fetchData();
+}, []);
 
 
-  const getNextFactureNumber = async() =>{
-    const {data} = await axios.get('http://localhost:443/factures/next')
+  const getNextFactureNumber = async () => {
+    const { data } = await axios.get('http://localhost:443/factures/next')
     setNfN(data.nextFactureNumber)
   }
   useEffect(() => {
@@ -119,9 +137,9 @@ function Facture() {
     totalHT: 0,
     remuneration: 0,
     netHT: 0,
-    fode: 0,
-    tva: 0,
-    timbreFiscal: 0,
+    fode: setting.fodec,
+    tva: setting.timbreFiscal,
+    timbreFiscal: setting.timbreFiscal,
     netAPayer: 0,
   });
 
@@ -137,18 +155,15 @@ function Facture() {
     });
 
     const netHT = totalHT - remuneration;
-    const valfodec = 1;
-    const valTva = 19; // 19% TVA
-    var fodec = (netHT / 100) * valfodec;
-    var tva = ((netHT + fodec) / 100) * valTva;
-    const timbreFiscal = 1;
+    var fodec = (netHT / 100) * setting.fodec;
+    var tva = ((netHT + fodec) / 100) * setting.Tva;
     var netAPayer = 0
     if (client.exonere) {
       fodec = 0
       tva = 0
-      netAPayer = netHT + timbreFiscal;
+      netAPayer = netHT + setting.timbreFiscal;
     } else {
-      netAPayer = netHT + fodec + tva + timbreFiscal;
+      netAPayer = netHT + fodec + tva + setting.timbreFiscal;
     }
 
     setInvoiceData({
@@ -157,104 +172,134 @@ function Facture() {
       netHT: netHT.toFixed(3),
       fode: fodec.toFixed(3),
       tva: tva.toFixed(3),
-      timbreFiscal: timbreFiscal.toFixed(3),
+      timbreFiscal: setting.timbreFiscal.toFixed(3),
       netAPayer: netAPayer.toFixed(3),
     });
   };
-  // Inside your component:
   const netAPayerInFrench = numberToWords(parseFloat(invoiceData.netAPayer));
+
+
+  // Imprimer et Enregistrer
+
+  const handelPrintAndSave = async () => {
+    try {
+      await axios.post('http://localhost:443/factures/add',{
+        DateFacture:date,
+        Nbc:0,
+        articles:articles,
+        totalcalcul:invoiceData,
+        netAPayer:netAPayerInFrench,
+        client:client._id
+      })
+      navigate(`/Facture/PrintFac`, {
+        state: {
+          articles: articles,
+          client: client,
+          date: date,
+          invoiceData: invoiceData,
+          netAPayerInFrench: netAPayerInFrench,
+          Nbc: 0,
+          nextFactureNumber: nextFactureNumber
+        }
+      });
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
   return (
     <div>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-      <thead>
-        <tr>
-          <th style={{ width: '25%', padding: '10px', textAlign: 'center' }}></th>
-          <th style={{ width: '35%', padding: '10px', textAlign: 'center' }}></th>
-          <th style={{ width: '20%', padding: '10px', textAlign: 'center' }}></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
-            <img src={img} alt="Company Logo" style={{ maxWidth: '130px', maxHeight: '100%' }} />
-          </td>
-          <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
-            <span style={{ fontSize: '24px'}}> {`Facture N°${nextFactureNumber}`}</span>
-          </td>
-          <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}></td>
-        </tr>
-      </tbody>
-    </table>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr>
+            <th style={{ width: '25%', padding: '10px', textAlign: 'center' }}></th>
+            <th style={{ width: '35%', padding: '10px', textAlign: 'center' }}></th>
+            <th style={{ width: '20%', padding: '10px', textAlign: 'center' }}></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
+              <img src={img} alt="Company Logo" style={{ maxWidth: '130px', maxHeight: '100%' }} />
+            </td>
+            <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
+              <span style={{ fontSize: '24px' }}> {`Facture N°${nextFactureNumber}`}</span>
+            </td>
+            <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}></td>
+          </tr>
+        </tbody>
+      </table>
 
-        <div style={{marginTop:'20px'}}>
-          <GetClient setClt={setClient} />
-        </div>
-      {client.referance !==undefined &&
+      <div style={{ marginTop: '20px' }}>
+        <GetClient setClt={setClient} />
+      </div>
+      {client.referance !== undefined &&
         <>
 
-        <div>
-          <table width="100%">
-            <tbody>
-              <tr>
-                <td>
-                  <label htmlFor="date">Date:</label>{' '}
-                  <input
-                    type="date"
-                    name="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                  />
-                </td>
-                <td>
-                  <label htmlFor="nbc">N°BC:</label>{' '}
-                  <input type="text" name="nbc" />
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div>
-          <FacArticles setArtcl={setArticles} />
-        </div>
-        <div style={{ marginTop: 50 }}>
-          <table width='100%' border={1}>
-            <thead>
-              <tr>
-                <th>Total HT </th>
-                <th>Rem</th>
-                <th>Net HT</th>
-                <th>Fode</th>
-                <th>Tva</th>
-                <th>Timbre Fiscal</th>
-                <th>Net a Payer</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><center>{invoiceData.totalHT}</center></td>
-                <td><center>{invoiceData.remuneration}</center></td>
-                <td><center>{invoiceData.netHT}</center></td>
-                <td><center>{invoiceData.fode}</center></td>
-                <td><center>{invoiceData.tva}</center></td>
-                <td><center>{invoiceData.timbreFiscal}</center></td>
-                <td><center>{invoiceData.netAPayer}</center></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div>
-          <table width="100%" style={{ marginTop: 50 }}>
-            <tbody>
-              <tr>
-                <td>
-                  Arretée la présente facture a la somme de :{netAPayerInFrench}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <FacPrinter articles={articles} client={client} date={date} invoiceData={invoiceData} netAPayerInFrench={netAPayerInFrench} Nbc={0} nextFactureNumber={nextFactureNumber}/>
-
+          <div>
+            <table width="100%">
+              <tbody>
+                <tr>
+                  <td>
+                    <label htmlFor="date">Date:</label>{' '}
+                    <input
+                      type="date"
+                      name="date"
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
+                    />
+                  </td>
+                  <td>
+                    <label htmlFor="nbc">N°BC:</label>{' '}
+                    <input type="text" name="nbc" />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <FacArticles setArtcl={setArticles} />
+          </div>
+          <div style={{ marginTop: 50 }}>
+            <table width='100%' border={1}>
+              <thead>
+                <tr>
+                  <th>Total HT </th>
+                  <th>Rem</th>
+                  <th>Net HT</th>
+                  <th>Fode</th>
+                  <th>Tva</th>
+                  <th>Timbre Fiscal</th>
+                  <th>Net a Payer</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><center>{invoiceData.totalHT}</center></td>
+                  <td><center>{invoiceData.remuneration}</center></td>
+                  <td><center>{invoiceData.netHT}</center></td>
+                  <td><center>{invoiceData.fode}</center></td>
+                  <td><center>{invoiceData.tva}</center></td>
+                  <td><center>{invoiceData.timbreFiscal}</center></td>
+                  <td><center>{invoiceData.netAPayer}</center></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <table width="100%" style={{ marginTop: 50 }}>
+              <tbody>
+                <tr>
+                  <td>
+                    Arretée la présente facture a la somme de :{netAPayerInFrench}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <input type="button" value="Imprimer Et Enregistrer" onClick={handelPrintAndSave} />
+          </div>
         </>
       }
 

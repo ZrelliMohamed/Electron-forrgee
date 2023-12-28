@@ -9,6 +9,7 @@ function App() {
       <Link to="Clients">Clients</Link> &nbsp;&nbsp;&nbsp;&nbsp;
       <Link to="Articles">Articles</Link> &nbsp;&nbsp;&nbsp;&nbsp;
       <Link to="Facture">Facture</Link> &nbsp;&nbsp;&nbsp;&nbsp;
+      <Link to="Setting">Setting</Link> &nbsp;&nbsp;&nbsp;&nbsp;
 
     </div>
       <div >

@@ -1,9 +1,12 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import img from '../../../assets/Zim.jpg'
-function FacPrinter({ articles, client, date, invoiceData, netAPayerInFrench,Nbc,nextFactureNumber }) {
+import { useLocation } from 'react-router-dom';
+function FacPrinter() {
   const iframeRef = useRef(null);
+  const location = useLocation();
+  const {articles,client,invoiceData,netAPayerInFrench,Nbc,nextFactureNumber,date} = location.state;
   const handlePrint = async() => {
     const doc = new jsPDF();
 
@@ -30,7 +33,7 @@ function FacPrinter({ articles, client, date, invoiceData, netAPayerInFrench,Nbc
 
   // Add text for logo and invoice number in columns
   doc.setFontSize(12);
-  doc.setTextColor(255, 0, 0); // Set text color to black
+  doc.setTextColor(0, 0, 0); // Set text color to black
 
   const invoiceText = 'Facture N°:'+nextFactureNumber;
   const invoiceTextWidth = doc.getTextWidth(invoiceText); // Calculate text width
@@ -203,10 +206,13 @@ doc.autoTable({
     });
   };
 
+  useEffect(()=>{
+    handlePrint()
+  },[])
+
   return (
     <>
-      <input type="button" value="Imprimer" onClick={handlePrint} />
-      <div>
+      <div style={{marginTop:'20px'}}>
         <iframe title="PDF Preview" ref={iframeRef} style={{ width: '100%', height: '1080px', border: '1px solid black' }} />
       </div>
     </>

@@ -17,21 +17,27 @@ FactureSchema.pre('save', async function (next) {
     const currentYear = currentDate.getFullYear();
 
     if (!this.Numero) {
-        // Find the count of documents for the current year
-        const count = await this.constructor.countDocuments({
-            DateFacture: {
-                $gte: new Date(`${currentYear}-01-01`),
-                $lte: new Date(`${currentYear}-12-31T23:59:59`)
-            }
-        });
+        // Find the document with the highest Numero for the current year
+        const latestFacture = await this.constructor
+            .findOne({
+                Numero: { $regex: new RegExp(`\\/${currentYear}$`, 'i') } // Match the year in Numero
+            })
+            .sort({ Numero: -1 }) // Sort in descending order to get the highest Numero
+            .limit(1);
 
-        // Generate the Numero based on the count for the current year
-        const formattedCount = String(count + 1).padStart(6, '0'); // Pad with leading zeros
+        let count = 1; // Default count if no matching document found
+        if (latestFacture) {
+            const latestNumero = latestFacture.Numero.split('/')[0]; // Extract count from Numero
+            count = parseInt(latestNumero, 10) + 1; // Increment the count by 1
+        }
+
+        const formattedCount = String(count).padStart(6, '0'); // Pad with leading zeros
         this.Numero = `${formattedCount}/${currentYear}`;
     }
 
     next();
 });
+
 
 const Facture = mongoose.model('Facture', FactureSchema);
 module.exports = Facture;

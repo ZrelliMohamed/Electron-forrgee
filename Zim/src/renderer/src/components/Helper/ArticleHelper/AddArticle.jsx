@@ -3,11 +3,13 @@ import axios from 'axios';
 
 function AddArticle() {
   const [articleData, setArticleData] = useState({
+    referance: '',
     designation: '',
     unite: '',
     prix_unitaire: ''
   });
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -17,22 +19,28 @@ function AddArticle() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Make a POST request to your API endpoint to add the article
-      await axios.post('http://localhost:443/article/add', articleData);
-      console.log('Article added successfully!');
-      // Clear the form after successful submission
-      setArticleData({
-        designation: '',
-        unite: '',
-        prix_unitaire: ''
-      });
-      // Show success message for a few seconds
-      setShowSuccessMessage(true);
-      setTimeout(() => {
+      const response = await axios.post('http://localhost:443/article/add', articleData);
+      if (response.data && response.data.error) {
+        setErrorMessage('Reference already exists');
         setShowSuccessMessage(false);
-      }, 3000); // 3 seconds
+      } else {
+        console.log('Article added successfully!');
+        setArticleData({
+          referance: '',
+          designation: '',
+          unite: '',
+          prix_unitaire: ''
+        });
+        setShowSuccessMessage(true);
+        setErrorMessage('');
+        setTimeout(() => {
+          setShowSuccessMessage(false);
+        }, 3000); // 3 seconds
+      }
     } catch (error) {
       console.error('Error adding article:', error);
+      setErrorMessage(error.response.data.message);
+      setShowSuccessMessage(false);
     }
   };
 
@@ -43,10 +51,28 @@ function AddArticle() {
           Article added successfully!
         </div>
       )}
+      {errorMessage && (
+        <div style={{ background: 'lightcoral', padding: '10px', marginBottom: '10px' }}>
+          {errorMessage}
+        </div>
+      )}
       <h2>Add Article</h2>
       <form onSubmit={handleSubmit}>
         <table>
           <tbody>
+            <tr>
+              <td>
+                <label>Reference:</label>
+              </td>
+              <td>
+                <input
+                  type="text"
+                  name="referance"
+                  value={articleData.referance}
+                  onChange={handleChange}
+                />
+              </td>
+            </tr>
             <tr>
               <td>
                 <label>Designation:</label>
