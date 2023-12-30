@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import axios from 'axios';
-
 function UpdateClient() {
   const location = useLocation();
   const initialClientData = location.state.clientData;
@@ -59,20 +57,23 @@ function UpdateClient() {
   };
 
   const handleUpdateClient = async () => {
-    try {
-      console.log(updatedClient);
-      // Assuming the server endpoint for updating a client is 'http://localhost:443/clients/{clientId}'
-      await axios.put(`http://localhost:443/clients/put/${updatedClient.referance}`, updatedClient);
-      // Logic for handling client update success
-      setUpdateSuccess(true); // Set success message state to true
-      setTimeout(() => {
+    window.electron.ipcRenderer.send('Client:Update', updatedClient)
+    window.electron.ipcRenderer.on('UpdateClient:succes', (event, data) => {
+      setUpdateSuccess(true);
+         setTimeout(() => {
         setUpdateSuccess(false); // Reset success message after some time
       }, 3000);
-    } catch (error) {
-      console.error(error);
-      // Logic for error handling
-    }
+    })
+    window.electron.ipcRenderer.on('UpdateClient:ref?', (event, msg) => {
+      console.log(msg);
+    })
+    window.electron.ipcRenderer.on('UpdateClient:err', (event, err) => {
+      console.log(err);
+    })
+
+
   };
+
 
   const handleButtonClick = (e) => {
     e.preventDefault();

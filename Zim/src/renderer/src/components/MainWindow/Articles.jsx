@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 import Article from '../Helper/ArticleHelper/Article.jsx';
 
 function Articles() {
@@ -13,13 +12,14 @@ function Articles() {
   }
 
   const getAllArticles = async () => {
-    try {
-      const { data } = await axios.get('http://localhost:443/article/get');
+    window.electron.ipcRenderer.send('Articles', 'getAll')
+    window.electron.ipcRenderer.on('Articles-reply', (event, data) => {
       setArticles(data);
-      setSearchResults(data); // Initialize search results with all articles
-    } catch (error) {
-      console.log(error);
-    }
+      setSearchResults(data);
+    })
+    window.electron.ipcRenderer.on('Articles-reply:err', (event, data) => {
+      console.log(data);
+    })
   }
 
   const handleSearch = (e) => {

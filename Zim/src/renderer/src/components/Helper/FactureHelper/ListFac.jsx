@@ -15,12 +15,13 @@ function ListFac() {
   const [showConfirmDialogForFacture, setShowConfirmDialogForFacture] = useState(null);
 
   const getAll = async () => {
-    try {
-      const { data } = await axios.get('http://localhost:443/factures/all');
-      setFactures(data.factures);
-    } catch (error) {
-      console.log(error);
-    }
+        window.electron.ipcRenderer.send('Facture:GetAll', 'information')
+        window.electron.ipcRenderer.on('Facture:GetAll:succes', (event, data) => {
+          setFactures(data.factures);
+        })
+        window.electron.ipcRenderer.on('Facture:GetAll:err', (event, data) => {
+          console.log(error);
+        })
   };
 
   useEffect(() => {
@@ -55,15 +56,15 @@ function ListFac() {
 
   const handleConfirmation = async () => {
     if (selectedFacture) {
-      try {
-        await axios.delete(`http://localhost:443/factures/${selectedFacture._id}`);
+      window.electron.ipcRenderer.send('Facture:Delete', selectedFacture._id)
+      window.electron.ipcRenderer.on('Facture:Delete:succes', (event, data) => {
         setTogle(!togle);
-      } catch (error) {
-        console.log(error);
-      } finally {
         setShowConfirmDialog(false);
         setSelectedFacture(null);
-      }
+      })
+      window.electron.ipcRenderer.on('Facture:Delete:err', (event, data) => {
+        console.log(data);
+      })
     }
   };
 
@@ -119,6 +120,7 @@ function ListFac() {
             <th>Client</th>
             <th>Imprimer</th>
             <th></th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -144,6 +146,7 @@ function ListFac() {
                     />
                   )}
                 </td>
+                <td><input type="button" value="Update" /></td>
               </tr>
             ))
           }

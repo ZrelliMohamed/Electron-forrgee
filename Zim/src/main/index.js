@@ -1,11 +1,19 @@
-import { app, shell, BrowserWindow } from 'electron'
+import { app, shell, BrowserWindow,ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import dataBase from './server/database/index'
+import { handleClientIPC } from './server/ipcHandlers/ClientIPC'
+import { handleArticleIPC} from './server/ipcHandlers/ArticleIPC'
+import { handleFactureIPC } from './server/ipcHandlers/FactureIPC'
+let mainWindow
+
+
+
 
 function createWindow() {
   // Create the browser window.
-  const mainWindow = new BrowserWindow({
+   mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
     show: false,
@@ -25,6 +33,7 @@ function createWindow() {
     return { action: 'deny' }
   })
 
+
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -37,7 +46,7 @@ function createWindow() {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
+app.whenReady().then(async() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
@@ -49,6 +58,12 @@ app.whenReady().then(() => {
   })
 
   createWindow()
+
+  // All listener
+  handleClientIPC(mainWindow);
+  handleArticleIPC(mainWindow);
+  handleFactureIPC(mainWindow);
+
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
@@ -66,5 +81,5 @@ app.on('window-all-closed', () => {
   }
 })
 
-// In this file you can include the rest of your app"s specific main process
-// code. You can also put them in separate files and require them here.
+
+

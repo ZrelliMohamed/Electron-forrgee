@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import axios from 'axios';
-
 function AddArticle() {
   const [articleData, setArticleData] = useState({
     referance: '',
@@ -18,30 +16,31 @@ function AddArticle() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    try {
-      const response = await axios.post('http://localhost:443/article/add', articleData);
-      if (response.data && response.data.error) {
-        setErrorMessage('Reference already exists');
+    window.electron.ipcRenderer.send('Article:add', articleData)
+    window.electron.ipcRenderer.on('Article:add:ref?', (event, data) => {
+      setErrorMessage('Reference already exists');
+      setShowSuccessMessage(false);
+    })
+    window.electron.ipcRenderer.on('Article:add:succes', (event, data) => {
+      setArticleData({
+        referance: '',
+        designation: '',
+        unite: '',
+        prix_unitaire: ''
+      });
+      setShowSuccessMessage(true);
+      setErrorMessage('');
+      setTimeout(() => {
         setShowSuccessMessage(false);
-      } else {
-        console.log('Article added successfully!');
-        setArticleData({
-          referance: '',
-          designation: '',
-          unite: '',
-          prix_unitaire: ''
-        });
-        setShowSuccessMessage(true);
-        setErrorMessage('');
-        setTimeout(() => {
-          setShowSuccessMessage(false);
-        }, 3000); // 3 seconds
-      }
-    } catch (error) {
+      }, 3000); // 3 seconds
+
+    })
+
+    window.electron.ipcRenderer.on('Article:add:failer', (event, data) => {
       console.error('Error adding article:', error);
       setErrorMessage(error.response.data.message);
       setShowSuccessMessage(false);
-    }
+    })
   };
 
   return (

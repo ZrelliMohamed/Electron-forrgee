@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import axios from 'axios';
+import React, { useEffect, useState } from 'react';
 import CustomConfirmDialog from './CustomConfirmDialog';
 import { useNavigate } from 'react-router-dom';
 
@@ -16,17 +15,21 @@ function Client({ client, i, togle }) {
   const handleUpdate = (cl) => { navigate('/Clients/Update', { state: { clientData: cl } }); };
 
   const handleConfirmation = async () => {
-    try {
-      // Perform delete logic only when confirmed
-      await axios.delete(`http://localhost:443/clients/del/${client.referance}`);
-      console.log(`Deleted client with reference: ${client.referance}`);
+    // Perform delete logic only when confirmed
+    window.electron.ipcRenderer.send('Client:delete', client.referance)
+    window.electron.ipcRenderer.on('DeleteClient:succes', (event, data) => {
       togle();
-    } catch (error) {
-      console.log(error);
-    } finally {
+    }).then(() => {
       setShowConfirmDialog(false); // Close the confirmation dialog
       setIsDeleteButtonVisible(true); // Show the Delete button again
-    }
+    })
+    window.electron.ipcRenderer.on('DeleteClient:ref?', (event, msg) => {
+      console.log(msg);
+    })
+    window.electron.ipcRenderer.on('DeleteClient:err', (event, err) => {
+      console.log(err);
+    })
+
   };
 
   const handleCancel = () => {
@@ -36,7 +39,7 @@ function Client({ client, i, togle }) {
 
   return (
     <tr key={i}  >
-      <td style={{ textAlign: 'center' }}>{String(client.referance).slice(0,3)}&nbsp;{String(client.referance).slice(-3)}</td>
+      <td style={{ textAlign: 'center' }}>{String(client.referance).slice(0, 3)}&nbsp;{String(client.referance).slice(-3)}</td>
       <td style={{ textAlign: 'center' }}>{client.clientName}</td>
       <td style={{ textAlign: 'center' }}>{client.email}</td>
       <td style={{ textAlign: 'center' }}>

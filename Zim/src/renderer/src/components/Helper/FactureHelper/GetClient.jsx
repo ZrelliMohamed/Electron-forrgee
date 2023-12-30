@@ -1,7 +1,7 @@
 import axios from 'axios';
 import React, { useState } from 'react';
 
-function GetClient({setClt}) {
+function GetClient({ setClt }) {
   const [client, setClient] = useState({
     reference: '',
     name: '',
@@ -14,27 +14,26 @@ function GetClient({setClt}) {
   const [errorMessage, setErrorMessage] = useState('');
 
   const getTheClient = async (reference) => {
-    try {
-      const { data } = await axios.get(`http://localhost:443/clients/getOne/${reference}`);
-      if (data) {
-        setClt(data)
-        const { clientName, email, phoneNumber, address, MF, fax } = data;
-        setClient({
-          reference: reference,
-          name: clientName,
-          matFisc: MF,
-          telephone: phoneNumber[0] || '',
-          fax: fax || '',
-          address: address || '',
-          email: email || '',
-        });
-        setErrorMessage(''); // Clear any previous error message
-      } else {
-        setErrorMessage('Client not found');
-      }
-    } catch (error) {
-      console.log('this',error.response.data );
-      setErrorMessage(error.response.data.message);
+    window.electron.ipcRenderer.send('Client:getOne', reference)
+    window.electron.ipcRenderer.on("Client:getOne:succes", (event, data) => {
+      setClt(data)
+      const { clientName, email, phoneNumber, address, MF, fax } = data;
+      setClient({
+        reference: reference,
+        name: clientName,
+        matFisc: MF,
+        telephone: phoneNumber[0] || '',
+        fax: fax || '',
+        address: address || '',
+        email: email || '',
+      });
+      setErrorMessage(''); // Clear any previous error message
+    })
+    window.electron.ipcRenderer.on("Client:getOne:ref?", (event, data) => {
+      setErrorMessage('Client not found');
+    })
+    window.electron.ipcRenderer.on("Client:getOne:err", (event, data) => {
+      setErrorMessage(data.message);
       setClient({
         reference: '',
         name: '',
@@ -45,7 +44,8 @@ function GetClient({setClt}) {
         email: '',
       })
       setClt({})
-    }
+    })
+
   };
 
   const handleClientChange = (event) => {

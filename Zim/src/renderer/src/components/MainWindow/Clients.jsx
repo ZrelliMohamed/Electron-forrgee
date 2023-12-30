@@ -1,8 +1,5 @@
-
-import axios from 'axios';
 import { useEffect, useState } from 'react';
 import Client from '../Helper/ClientHelper/Client';
-
 function Clients() {
   const [clients, setClients] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -11,14 +8,6 @@ function Clients() {
   const togle =()=> {
     setReTogle(!reTogle)
   }
-  const getClient = async () => {
-    try {
-      let response = await axios.get('http://localhost:443/clients/get');
-      setClients(response.data);
-    } catch (error) {
-      console.log(error);
-    }
-  };
 
   const handleSearch = (event) => {
     setSearchTerm(event.target.value);
@@ -38,8 +27,15 @@ function Clients() {
   });
 
   useEffect(() => {
-    getClient();
+    window.electron.ipcRenderer.send('Client', 'getAll')
+    window.electron.ipcRenderer.on('Client-reply', (event, data) => {
+    setClients(data)
+    })
+    window.electron.ipcRenderer.on('Client-reply:err', (event, data) => {
+      console.log(data);
+    })
   }, [reTogle]);
+
 
   return (
     <div>

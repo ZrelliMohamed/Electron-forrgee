@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import CustomConfirmDialog from '../ClientHelper/CustomConfirmDialog'; // Import your CustomConfirmDialog component here
 import { useNavigate } from 'react-router-dom';
 function Article({ article, togle }) {
@@ -11,22 +10,21 @@ function Article({ article, togle }) {
     setShowConfirmDialog(true); // Show confirmation dialog when attempting to delete
     setIsDeleteButtonVisible(false); // Hide the Delete button
   };
-  const handleUpdate =  (artcl) => { navigate('/Articles/Update', { state: { articleData: artcl } }); };
+  const handleUpdate = (artcl) => { navigate('/Articles/Update', { state: { articleData: artcl } }); };
 
 
 
   const handleConfirmation = async () => {
-    try {
-      // Perform delete logic only when confirmed
-      await axios.delete(`http://localhost:443/article/del/${article.referance}`);
-      console.log(`Deleted article with reference: ${article.referance}`);
+    window.electron.ipcRenderer.send('Article:delete', article.referance)
+    window.electron.ipcRenderer.on('Delete:Article:succes', (event, data) => {
       togle();
-    } catch (error) {
-      console.log(error);
-    } finally {
       setShowConfirmDialog(false); // Close the confirmation dialog
       setIsDeleteButtonVisible(true); // Show the Delete button again
-    }
+    })
+    window.electron.ipcRenderer.on('Delete:Article:err', (event, data) => {
+      console.log(data);
+    })
+
   };
 
   const handleCancel = () => {
@@ -53,7 +51,7 @@ function Article({ article, togle }) {
           />
         )}
       </td>
-      <td style={{ textAlign: 'center' }}><input type="button" value="Update" onClick={() =>handleUpdate(article)} /></td>
+      <td style={{ textAlign: 'center' }}><input type="button" value="Update" onClick={() => handleUpdate(article)} /></td>
     </tr>
   );
 }

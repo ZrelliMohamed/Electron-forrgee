@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useState } from 'react';
+import { useState} from 'react';
 
 const AddClient = () => {
   const [newClient, setNewClient] = useState({
@@ -58,11 +58,9 @@ const AddClient = () => {
   };
 
   const handleAddClient = async (e) => {
-    try {
       e.preventDefault();
-      console.log(newClient);
-      await axios.post('http://localhost:443/clients/add', newClient);
-      // Add your logic for handling client addition here
+      window.electron.ipcRenderer.send('Client:add', newClient)
+      window.electron.ipcRenderer.on('Client:succes', (event, data) => {
       setSuccessMessage('Client successfully added.'); // Set success message
       setNewClient({ // Reset form inputs
         clientName: '',
@@ -73,15 +71,15 @@ const AddClient = () => {
         fax: '',
         exonere: false, // Reset exonere to default value
       });
-    } catch (error) {
-      console.log(error);
-    }
+        })
+      // Add your logic for handling client addition here
+      window.electron.ipcRenderer.on('Client:failer', (event, data) => {
+        console.log(data);
+      })
+
   };
 
-  const handleButtonClick = (e) => {
-    e.preventDefault();
-    handleAddClient();
-  };
+
 
 
   return (

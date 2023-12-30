@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import axios from 'axios';
-
 function UpdateArtcl() {
   const location = useLocation();
   const initialArticleData = location.state.articleData;
@@ -27,19 +25,18 @@ function UpdateArtcl() {
   };
 
   const handleUpdateArticle = async () => {
-    try {
-      console.log(updatedArticle);
-      // Assuming the server endpoint for updating an article is 'http://localhost:443/article/update/{articleId}'
-      await axios.put(`http://localhost:443/article/put/${updatedArticle.referance}`, updatedArticle);
-      // Logic for handling article update success
+    window.electron.ipcRenderer.send('Article:Update', updatedArticle)
+    window.electron.ipcRenderer.on('Update:Article:succes', (event, data) => {
       setUpdateSuccess(true); // Set success message state to true
       setTimeout(() => {
         setUpdateSuccess(false); // Reset success message after some time
       }, 3000);
-    } catch (error) {
-      console.error(error);
-      // Logic for error handling
-    }
+    })
+    window.electron.ipcRenderer.on('Update:Article:ref?'|| "Update:Article:err", (event, msg) => {
+      console.log(msg);
+    })
+
+
   };
 
   const handleButtonClick = (e) => {

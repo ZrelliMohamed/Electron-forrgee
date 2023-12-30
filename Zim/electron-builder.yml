@@ -3,6 +3,8 @@ productName: zim
 directories:
   buildResources: build
 files:
+  - '**/*'
+  - 'server/**/*'
   - '!**/.vscode/*'
   - '!src/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'

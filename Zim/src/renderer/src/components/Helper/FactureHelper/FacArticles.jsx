@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 
-function FacArticles({setArtcl}) {
+function FacArticles({ setArtcl }) {
   const [articles, setArticles] = useState([]);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -29,11 +29,9 @@ function FacArticles({setArtcl}) {
           return updatedArticles;
         });
       } else {
-        try {
-          if (value) {
-            const response = await axios.get(`http://localhost:443/article/getOne/${value}`);
-            const { data } = response;
-
+        if (value) {
+          window.electron.ipcRenderer.send('Article:getOne', value)
+          window.electron.ipcRenderer.on('Article:getOne:succes', (event, data) => {
             // Update the article data based on the retrieved information
             setArticles((prevArticles) => {
               const updatedArticles = [...prevArticles];
@@ -49,26 +47,27 @@ function FacArticles({setArtcl}) {
               return updatedArticles;
             });
             setErrorMessage(``);
-          }
-        } catch (error) {
-          if (value !== undefined) {
-            console.error('Error retrieving article data:', error);
+          });
+        }
+        if (value !== undefined) {
+          window.electron.ipcRenderer.on("Article:getOne:ref?" || "Article:getOne:err", (event, data) => {
             setErrorMessage(`Error retrieving article data for reference ${value}`);
             setArticles((prevArticles) => {
               const updatedArticles = [...prevArticles];
-              updatedArticles[index] = {
-                reference: '',
-                designation: '',
-                unit: 0,
-                quantity: 0,
-                pricePerUnit: 0,
-                totalPrice: 0,
-                remuneration: 0,
-              };
-              return updatedArticles;
-            });
-          }
+            updatedArticles[index] = {
+             reference: '',
+             designation: '',
+            unit: 0,
+            quantity: 0,
+             pricePerUnit: 0,
+            totalPrice: 0,
+              remuneration: 0,
+             };
+             return updatedArticles;
+             });
+          });
         }
+
       }
     }
 

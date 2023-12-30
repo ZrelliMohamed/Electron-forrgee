@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import GetClient from '../Helper/FactureHelper/GetClient';
 import FacArticles from '../Helper/FactureHelper/FacArticles';
 import img from '../../assets/Zim.jpg'
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 function Facture() {
   const [articles, setArticles] = useState([]);
@@ -13,25 +12,28 @@ function Facture() {
     Tva: 0,
     fodec: 0,
     timbreFiscal: 0,
-});
+  });
 
-const fetchData = async () => {
-  try {
-      const response = await axios.get('http://localhost:443/setting');
-      const { Tva, fodec, timbreFiscal } = response.data.document;
+  const fetchData = async () => {
+    window.electron.ipcRenderer.send('Facture:Setting', 'Tva/fodec/timbreFiscal')
+    window.electron.ipcRenderer.on('Facture:Setting-reply', (event, data) => {
+      const { Tva, fodec, timbreFiscal } = data.documentToSend;
       setSetting({ Tva, fodec, timbreFiscal });
-  } catch (error) {
-      setError('Error fetching data: ' + error.message);
-  }
-};
-useEffect(() => {
-  fetchData();
-}, []);
+    })
+    window.electron.ipcRenderer.on('Facture:Setting:err', (event, data) => {
+      setError('Error fetching data: ' + data.message);
+    })
+  };
+  useEffect(() => {
+    fetchData();
+  }, []);
 
 
   const getNextFactureNumber = async () => {
-    const { data } = await axios.get('http://localhost:443/factures/next')
-    setNfN(data.nextFactureNumber)
+    window.electron.ipcRenderer.send('Facture:nextNumero', 'information')
+    window.electron.ipcRenderer.on('Facture:nextNumero-reply', (event, data) => {
+      setNfN(data.nextFactureNumber)
+    })
   }
   useEffect(() => {
     getNextFactureNumber()
@@ -122,7 +124,6 @@ useEffect(() => {
 
   useEffect(() => {
     calculateInvoiceData();
-
   }, [articles]);
 
   const [date, setDate] = useState(getFormattedDate());
@@ -182,15 +183,15 @@ useEffect(() => {
   // Imprimer et Enregistrer
 
   const handelPrintAndSave = async () => {
-    try {
-      await axios.post('http://localhost:443/factures/add',{
-        DateFacture:date,
-        Nbc:0,
-        articles:articles,
-        totalcalcul:invoiceData,
-        netAPayer:netAPayerInFrench,
-        client:client._id
-      })
+    window.electron.ipcRenderer.send('Facture:create', {
+      DateFacture: date,
+      Nbc: 0,
+      articles: articles,
+      totalcalcul: invoiceData,
+      netAPayer: netAPayerInFrench,
+      client: client._id
+    })
+    window.electron.ipcRenderer.on('Facture:create:succes', (event, data) => {
       navigate(`/Facture/PrintFac`, {
         state: {
           articles: articles,
@@ -201,111 +202,111 @@ useEffect(() => {
           Nbc: 0,
           nextFactureNumber: nextFactureNumber
         }
-      });
-    } catch (error) {
-      console.log(error);
-    }
+      })
+    })
+    window.electron.ipcRenderer.on('Facture:create:err', (event, data) => {
+      console.log(data);
+    })
+  }
+    return (
+      <div>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={{ width: '25%', padding: '10px', textAlign: 'center' }}></th>
+              <th style={{ width: '35%', padding: '10px', textAlign: 'center' }}></th>
+              <th style={{ width: '20%', padding: '10px', textAlign: 'center' }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
+                <img src={img} alt="Company Logo" style={{ maxWidth: '130px', maxHeight: '100%' }} />
+              </td>
+              <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
+                <span style={{ fontSize: '24px' }}> {`Facture N°${nextFactureNumber}`}</span>
+              </td>
+              <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style={{ marginTop: '20px' }}>
+          <GetClient setClt={setClient} />
+        </div>
+        {client.referance !== undefined &&
+          <>
+
+            <div>
+              <table width="100%">
+                <tbody>
+                  <tr>
+                    <td>
+                      <label htmlFor="date">Date:</label>{' '}
+                      <input
+                        type="date"
+                        name="date"
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <label htmlFor="nbc">N°BC:</label>{' '}
+                      <input type="text" name="nbc" />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div>
+              <FacArticles setArtcl={setArticles} />
+            </div>
+            <div style={{ marginTop: 50 }}>
+              <table width='100%' border={1}>
+                <thead>
+                  <tr>
+                    <th>Total HT </th>
+                    <th>Rem</th>
+                    <th>Net HT</th>
+                    <th>Fode</th>
+                    <th>Tva</th>
+                    <th>Timbre Fiscal</th>
+                    <th>Net a Payer</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><center>{invoiceData.totalHT}</center></td>
+                    <td><center>{invoiceData.remuneration}</center></td>
+                    <td><center>{invoiceData.netHT}</center></td>
+                    <td><center>{invoiceData.fode}</center></td>
+                    <td><center>{invoiceData.tva}</center></td>
+                    <td><center>{invoiceData.timbreFiscal}</center></td>
+                    <td><center>{invoiceData.netAPayer}</center></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div>
+              <table width="100%" style={{ marginTop: 50 }}>
+                <tbody>
+                  <tr>
+                    <td>
+                      Arretée la présente facture a la somme de :{netAPayerInFrench}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div>
+              <input type="button" value="Imprimer Et Enregistrer" onClick={handelPrintAndSave} />
+            </div>
+          </>
+        }
+
+      </div>
+    );
   }
 
-  return (
-    <div>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            <th style={{ width: '25%', padding: '10px', textAlign: 'center' }}></th>
-            <th style={{ width: '35%', padding: '10px', textAlign: 'center' }}></th>
-            <th style={{ width: '20%', padding: '10px', textAlign: 'center' }}></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
-              <img src={img} alt="Company Logo" style={{ maxWidth: '130px', maxHeight: '100%' }} />
-            </td>
-            <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
-              <span style={{ fontSize: '24px' }}> {`Facture N°${nextFactureNumber}`}</span>
-            </td>
-            <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}></td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div style={{ marginTop: '20px' }}>
-        <GetClient setClt={setClient} />
-      </div>
-      {client.referance !== undefined &&
-        <>
-
-          <div>
-            <table width="100%">
-              <tbody>
-                <tr>
-                  <td>
-                    <label htmlFor="date">Date:</label>{' '}
-                    <input
-                      type="date"
-                      name="date"
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
-                    />
-                  </td>
-                  <td>
-                    <label htmlFor="nbc">N°BC:</label>{' '}
-                    <input type="text" name="nbc" />
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div>
-            <FacArticles setArtcl={setArticles} />
-          </div>
-          <div style={{ marginTop: 50 }}>
-            <table width='100%' border={1}>
-              <thead>
-                <tr>
-                  <th>Total HT </th>
-                  <th>Rem</th>
-                  <th>Net HT</th>
-                  <th>Fode</th>
-                  <th>Tva</th>
-                  <th>Timbre Fiscal</th>
-                  <th>Net a Payer</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><center>{invoiceData.totalHT}</center></td>
-                  <td><center>{invoiceData.remuneration}</center></td>
-                  <td><center>{invoiceData.netHT}</center></td>
-                  <td><center>{invoiceData.fode}</center></td>
-                  <td><center>{invoiceData.tva}</center></td>
-                  <td><center>{invoiceData.timbreFiscal}</center></td>
-                  <td><center>{invoiceData.netAPayer}</center></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div>
-            <table width="100%" style={{ marginTop: 50 }}>
-              <tbody>
-                <tr>
-                  <td>
-                    Arretée la présente facture a la somme de :{netAPayerInFrench}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div>
-            <input type="button" value="Imprimer Et Enregistrer" onClick={handelPrintAndSave} />
-          </div>
-        </>
-      }
-
-    </div>
-  );
-}
-
-export default Facture;
+  export default Facture;
 
