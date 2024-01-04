@@ -19,7 +19,6 @@ function Client({ client, i, togle }) {
     window.electron.ipcRenderer.send('Client:delete', client.referance)
     window.electron.ipcRenderer.on('DeleteClient:succes', (event, data) => {
       togle();
-    }).then(() => {
       setShowConfirmDialog(false); // Close the confirmation dialog
       setIsDeleteButtonVisible(true); // Show the Delete button again
     })

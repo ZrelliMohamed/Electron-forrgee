@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 function AddArticle() {
   const [articleData, setArticleData] = useState({
-    referance: '',
+    reference: '',
     designation: '',
     unite: '',
     prix_unitaire: ''
@@ -23,7 +23,7 @@ function AddArticle() {
     })
     window.electron.ipcRenderer.on('Article:add:succes', (event, data) => {
       setArticleData({
-        referance: '',
+        reference: '',
         designation: '',
         unite: '',
         prix_unitaire: ''
@@ -66,8 +66,8 @@ function AddArticle() {
               <td>
                 <input
                   type="text"
-                  name="referance"
-                  value={articleData.referance}
+                  name="reference"
+                  value={articleData.reference}
                   onChange={handleChange}
                 />
               </td>

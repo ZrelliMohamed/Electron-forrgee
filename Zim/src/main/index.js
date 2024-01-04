@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow,ipcMain } from 'electron'
+import { app, shell, BrowserWindow,screen } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -7,33 +7,28 @@ import { handleClientIPC } from './server/ipcHandlers/ClientIPC'
 import { handleArticleIPC} from './server/ipcHandlers/ArticleIPC'
 import { handleFactureIPC } from './server/ipcHandlers/FactureIPC'
 let mainWindow
-
-
-
-
 function createWindow() {
   // Create the browser window.
+  const mainScreen = screen.getPrimaryDisplay();
+  const dimensions = mainScreen.size;
    mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    width: dimensions.width,
+    height: dimensions.height,
     show: false,
+    // autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
     }
   })
-
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
-
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
-
-
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {

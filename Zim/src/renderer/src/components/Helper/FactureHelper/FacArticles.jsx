@@ -1,17 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
 
-function FacArticles({ setArtcl }) {
+function FacArticles({ setArtcl, artcl }) {
+  const hasArticles = artcl !== undefined;
   const [articles, setArticles] = useState([]);
   const [errorMessage, setErrorMessage] = useState('');
-
+  useEffect(() => {
+    if (hasArticles) {
+      setArticles(artcl);
+      setArtcl(artcl)
+    }
+  }, [hasArticles])
 
   useEffect(() => {
     setArtcl(articles);
   }, [articles])
   const handleArticleChange = async (event, index) => {
     const { name, value } = event.target;
-
+    window.electron.ipcRenderer.removeAllListeners('Article:getOne:succes');
+    window.electron.ipcRenderer.removeAllListeners('Article:getOne:ref?');
+    window.electron.ipcRenderer.removeAllListeners('Article:getOne:err');
     if (name === 'reference') {
       if (value === '') {
         // If the reference is empty, set all other fields to their initial values
@@ -36,7 +43,7 @@ function FacArticles({ setArtcl }) {
             setArticles((prevArticles) => {
               const updatedArticles = [...prevArticles];
               updatedArticles[index] = {
-                reference: data.referance,
+                reference: data.reference,
                 designation: data.designation,
                 unit: data.unite,
                 quantity: 0,
@@ -44,27 +51,27 @@ function FacArticles({ setArtcl }) {
                 totalPrice: 0,
                 remuneration: 0,
               };
+
               return updatedArticles;
             });
             setErrorMessage(``);
           });
-        }
-        if (value !== undefined) {
           window.electron.ipcRenderer.on("Article:getOne:ref?" || "Article:getOne:err", (event, data) => {
+
             setErrorMessage(`Error retrieving article data for reference ${value}`);
             setArticles((prevArticles) => {
               const updatedArticles = [...prevArticles];
-            updatedArticles[index] = {
-             reference: '',
-             designation: '',
-            unit: 0,
-            quantity: 0,
-             pricePerUnit: 0,
-            totalPrice: 0,
-              remuneration: 0,
-             };
-             return updatedArticles;
-             });
+              updatedArticles[index] = {
+                reference: '',
+                designation: '',
+                unit: 0,
+                quantity: 0,
+                pricePerUnit: 0,
+                totalPrice: 0,
+                remuneration: 0,
+              };
+              return updatedArticles;
+            });
           });
         }
 
@@ -72,6 +79,7 @@ function FacArticles({ setArtcl }) {
     }
 
     if (name === 'remuneration') {
+
       // Calculate discountedPrice
       setArticles((prevArticles) => {
         const updatedArticles = [...prevArticles];
@@ -90,12 +98,13 @@ function FacArticles({ setArtcl }) {
       });
     }
     else if (name === 'quantity' || name === 'pricePerUnit') {
+
       setArticles((prevArticles) => {
         const updatedArticles = [...prevArticles];
         updatedArticles[index][name] = value;
 
         // Calculate totalPrice
-        const quantity = parseInt(updatedArticles[index].quantity);
+        const quantity = parseFloat(updatedArticles[index].quantity);
         const pricePerUnit = parseFloat(updatedArticles[index].pricePerUnit);
         if (!isNaN(quantity) && !isNaN(pricePerUnit)) {
           updatedArticles[index].totalPrice = (quantity * pricePerUnit).toFixed(2);
@@ -103,12 +112,6 @@ function FacArticles({ setArtcl }) {
           updatedArticles[index].totalPrice = 0;
         }
 
-        return updatedArticles;
-      });
-    } else {
-      setArticles((prevArticles) => {
-        const updatedArticles = [...prevArticles];
-        updatedArticles[index][name] = value;
         return updatedArticles;
       });
     }
@@ -131,12 +134,11 @@ function FacArticles({ setArtcl }) {
 
   const deleteArticle = (index) => {
     setArticles((prevArticles) => {
-      const updatedArticles = [...prevArticles];
+      const updatedArticles = JSON.parse(JSON.stringify(prevArticles));
       updatedArticles.splice(index, 1);
       return updatedArticles;
     });
   };
-
   return (
     <>
       {errorMessage && <div>{errorMessage}</div>}
@@ -156,12 +158,14 @@ function FacArticles({ setArtcl }) {
         </thead>
         <tbody>
           {articles.map((article, index) => (
-            <tr key={index}>
+            <tr key={`${index}-${article.reference}`}>
               <td style={{ textAlign: 'center' }}>
                 <input
                   type="text"
                   name="reference"
+                  defaultValue={article.reference}
                   onChange={(event) => handleArticleChange(event, index)}
+                  key={`${index}-${article.reference}`}
                   style={{ textAlign: 'center' }}
                 />
               </td>

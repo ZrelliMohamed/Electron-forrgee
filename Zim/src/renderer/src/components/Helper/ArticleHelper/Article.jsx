@@ -15,7 +15,7 @@ function Article({ article, togle }) {
 
 
   const handleConfirmation = async () => {
-    window.electron.ipcRenderer.send('Article:delete', article.referance)
+    window.electron.ipcRenderer.send('Article:delete', article.reference)
     window.electron.ipcRenderer.on('Delete:Article:succes', (event, data) => {
       togle();
       setShowConfirmDialog(false); // Close the confirmation dialog
@@ -34,7 +34,7 @@ function Article({ article, togle }) {
 
   return (
     <tr>
-      <td style={{ textAlign: 'center' }}>{article.referance}</td>
+      <td style={{ textAlign: 'center' }}>{article.reference}</td>
       <td style={{ textAlign: 'center' }}>{article.designation}</td>
       <td style={{ textAlign: 'center' }}>{article.unite}</td>
       <td style={{ textAlign: 'center' }}>{article.prix_unitaire}</td>

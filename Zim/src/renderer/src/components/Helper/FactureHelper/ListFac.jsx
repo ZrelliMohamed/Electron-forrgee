@@ -1,4 +1,3 @@
-import axios from 'axios';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CustomConfirmDialog from '../ClientHelper/CustomConfirmDialog';
@@ -20,7 +19,7 @@ function ListFac() {
           setFactures(data.factures);
         })
         window.electron.ipcRenderer.on('Facture:GetAll:err', (event, data) => {
-          console.log(error);
+          console.log(data);
         })
   };
 
@@ -45,7 +44,7 @@ function ListFac() {
   const handleDelete = (facture) => {
     setSelectedFacture(facture);
     setShowConfirmDialogForFacture(facture);
-    setIsDeleteButtonVisible(false);
+    setIsDeleteButtonVisible(true);
   };
 
   const handleCancel = () => {
@@ -146,7 +145,11 @@ function ListFac() {
                     />
                   )}
                 </td>
-                <td><input type="button" value="Update" /></td>
+                <td><input type="button" value="Update" onClick={()=>{
+                     Navigate(`/Facture/Fac`, {
+                      state: {facture},
+                    });
+                }} /></td>
               </tr>
             ))
           }

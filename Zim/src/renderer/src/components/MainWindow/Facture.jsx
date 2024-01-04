@@ -1,10 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect} from 'react';
 import GetClient from '../Helper/FactureHelper/GetClient';
 import FacArticles from '../Helper/FactureHelper/FacArticles';
 import img from '../../assets/Zim.jpg'
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 function Facture() {
+  const [ModeUpdate, setModeUpdate] = useState(false);
+  const [dateMin,setDateMin]=useState("2000-01-01")
+  const location = useLocation();
+  const factureFromLocation = location.state ? location.state.facture : null;
   const [articles, setArticles] = useState([]);
+  const [showArticleMessage, setShowArticleMessage] = useState(false);
   const [client, setClient] = useState({});
   const [nextFactureNumber, setNfN] = useState('');
   const navigate = useNavigate()
@@ -13,8 +18,16 @@ function Facture() {
     fodec: 0,
     timbreFiscal: 0,
   });
-
-  const fetchData = async () => {
+  useEffect(() => {
+    if (factureFromLocation === undefined || factureFromLocation === null) {
+      setModeUpdate(false);
+    } else {
+      setModeUpdate(true);
+    }
+  }, [factureFromLocation, ModeUpdate]);
+  const fetchData =() => {
+    window.electron.ipcRenderer.removeAllListeners('Facture:Setting-reply')
+    window.electron.ipcRenderer.removeAllListeners('Facture:Setting:err')
     window.electron.ipcRenderer.send('Facture:Setting', 'Tva/fodec/timbreFiscal')
     window.electron.ipcRenderer.on('Facture:Setting-reply', (event, data) => {
       const { Tva, fodec, timbreFiscal } = data.documentToSend;
@@ -24,19 +37,33 @@ function Facture() {
       setError('Error fetching data: ' + data.message);
     })
   };
+  const getThelastDate =() => {
+    window.electron.ipcRenderer.removeAllListeners('GetLastDate:succes')
+    window.electron.ipcRenderer.send('GetLastDate', '')
+    window.electron.ipcRenderer.on('GetLastDate:succes', (event, data) => {
+      setDateMin(data.date)
+    })
+    window.electron.ipcRenderer.on('GetLastDate:ref?', (event, data) => {
+      setDateMin(data.date)
+    })
+
+  }
   useEffect(() => {
     fetchData();
+    getThelastDate()
+
   }, []);
-
-
-  const getNextFactureNumber = async () => {
+  const getNextFactureNumber = () => {
+    window.electron.ipcRenderer.removeAllListeners('Facture:nextNumero-reply')
     window.electron.ipcRenderer.send('Facture:nextNumero', 'information')
     window.electron.ipcRenderer.on('Facture:nextNumero-reply', (event, data) => {
       setNfN(data.nextFactureNumber)
     })
   }
   useEffect(() => {
-    getNextFactureNumber()
+    if (!ModeUpdate) {
+      getNextFactureNumber()
+    }
   }, []);
   // Function to convert number into French words
   function numberToWords(number) {
@@ -115,31 +142,16 @@ function Facture() {
     return result;
   }
 
-
-
-
-
-
-
-
   useEffect(() => {
     calculateInvoiceData();
-  }, [articles]);
-
-  const [date, setDate] = useState(getFormattedDate());
-
-  function getFormattedDate() {
-    const currentDate = new Date();
-    const formattedDate = currentDate.toISOString().split('T')[0];
-    return formattedDate;
-  }
+  }, [articles,setting,client]);
 
   const [invoiceData, setInvoiceData] = useState({
     totalHT: 0,
     remuneration: 0,
     netHT: 0,
     fode: setting.fodec,
-    tva: setting.timbreFiscal,
+    tva: setting.Tva,
     timbreFiscal: setting.timbreFiscal,
     netAPayer: 0,
   });
@@ -166,7 +178,6 @@ function Facture() {
     } else {
       netAPayer = netHT + fodec + tva + setting.timbreFiscal;
     }
-
     setInvoiceData({
       totalHT: totalHT.toFixed(3),
       remuneration: remuneration.toFixed(3),
@@ -179,134 +190,202 @@ function Facture() {
   };
   const netAPayerInFrench = numberToWords(parseFloat(invoiceData.netAPayer));
 
+  const dateUpdateFacture = (date) => {
+    if (date) {
+      const parts = date.split('-');
+      // Ensure parts have leading zeros if needed
+      const formattedDate = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+      return formattedDate
+    }
+  }
 
   // Imprimer et Enregistrer
 
   const handelPrintAndSave = async () => {
-    window.electron.ipcRenderer.send('Facture:create', {
-      DateFacture: date,
-      Nbc: 0,
-      articles: articles,
-      totalcalcul: invoiceData,
-      netAPayer: netAPayerInFrench,
-      client: client._id
-    })
-    window.electron.ipcRenderer.on('Facture:create:succes', (event, data) => {
-      navigate(`/Facture/PrintFac`, {
-        state: {
-          articles: articles,
-          client: client,
-          date: date,
-          invoiceData: invoiceData,
-          netAPayerInFrench: netAPayerInFrench,
+    const filteredArticles = articles.filter(article => {
+      return article.reference !== ""
+    });
+    if (filteredArticles.length > 0) {
+
+      if (!ModeUpdate) {
+    window.electron.ipcRenderer.removeAllListeners('Facture:create:succes')
+    window.electron.ipcRenderer.removeAllListeners('Facture:create:err')
+        window.electron.ipcRenderer.send('Facture:create', {
+          DateFacture: dateMin,
           Nbc: 0,
-          nextFactureNumber: nextFactureNumber
-        }
-      })
-    })
-    window.electron.ipcRenderer.on('Facture:create:err', (event, data) => {
-      console.log(data);
-    })
+          articles: filteredArticles,
+          totalcalcul: invoiceData,
+          netAPayer: netAPayerInFrench,
+          client: client._id
+        })
+        window.electron.ipcRenderer.on('Facture:create:succes', (event, data) => {
+          navigate(`/Facture/PrintFac`, {
+            state: {
+              articles: articles,
+              client: {...client,referance:client.referance},
+              date: dateMin,
+              invoiceData: invoiceData,
+              netAPayerInFrench: netAPayerInFrench,
+              Nbc: 0,
+              nextFactureNumber: nextFactureNumber
+            }
+          })
+        })
+        window.electron.ipcRenderer.on('Facture:create:err', (event, data) => {
+
+          console.log(data);
+        })
+      } else {
+        window.electron.ipcRenderer.removeAllListeners('Facture:Update:succes')
+        window.electron.ipcRenderer.removeAllListeners('Facture:Update:ref?')
+        window.electron.ipcRenderer.removeAllListeners('Facture:Update:err')
+        /*******************************************Updating********************************************** */
+        window.electron.ipcRenderer.send('Facture:Update', {
+          _id: factureFromLocation._id,
+          DateFacture: factureFromLocation.DateFacture,
+          Nbc: 0,
+          articles: filteredArticles,
+          totalcalcul: invoiceData,
+          netAPayer: netAPayerInFrench,
+          client: client._id
+        })
+        window.electron.ipcRenderer.on('Facture:Update:succes', (event, data) => {
+          navigate(`/Facture/PrintFac`, {
+            state: {
+              articles: filteredArticles,
+              client: client,
+              date: factureFromLocation.DateFacture,
+              invoiceData: invoiceData,
+              netAPayerInFrench: netAPayerInFrench,
+              Nbc: 0,
+              nextFactureNumber: factureFromLocation.Numero
+            }
+          })
+          window.electron.ipcRenderer.on('Facture:Update:ref?' || 'Facture:Update:err', (event, data) => {
+            console.log('2');
+          })
+        })
+        /************************************************************************************************* */
+      }
+    } else {
+      setShowArticleMessage(true);
+    }
   }
-    return (
-      <div>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={{ width: '25%', padding: '10px', textAlign: 'center' }}></th>
-              <th style={{ width: '35%', padding: '10px', textAlign: 'center' }}></th>
-              <th style={{ width: '20%', padding: '10px', textAlign: 'center' }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
-                <img src={img} alt="Company Logo" style={{ maxWidth: '130px', maxHeight: '100%' }} />
-              </td>
-              <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
-                <span style={{ fontSize: '24px' }}> {`Facture N°${nextFactureNumber}`}</span>
-              </td>
-              <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}></td>
-            </tr>
-          </tbody>
-        </table>
+  return (
+    <div>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr>
+            <th style={{ width: '25%', padding: '10px', textAlign: 'center' }}></th>
+            <th style={{ width: '35%', padding: '10px', textAlign: 'center' }}></th>
+            <th style={{ width: '20%', padding: '10px', textAlign: 'center' }}></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
+              <img src={img} alt="Company Logo" style={{ maxWidth: '130px', maxHeight: '100%' }} />
+            </td>
+            <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
+              <span style={{ fontSize: '24px' }}> {`Facture N°${ModeUpdate ? factureFromLocation?.Numero : nextFactureNumber}`}</span><br />
+            </td>
+            <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}></td>
+          </tr>
+        </tbody>
+      </table>
 
-        <div style={{ marginTop: '20px' }}>
-          <GetClient setClt={setClient} />
-        </div>
-        {client.referance !== undefined &&
-          <>
-
-            <div>
-              <table width="100%">
-                <tbody>
-                  <tr>
-                    <td>
-                      <label htmlFor="date">Date:</label>{' '}
-                      <input
-                        type="date"
-                        name="date"
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <label htmlFor="nbc">N°BC:</label>{' '}
-                      <input type="text" name="nbc" />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div>
-              <FacArticles setArtcl={setArticles} />
-            </div>
-            <div style={{ marginTop: 50 }}>
-              <table width='100%' border={1}>
-                <thead>
-                  <tr>
-                    <th>Total HT </th>
-                    <th>Rem</th>
-                    <th>Net HT</th>
-                    <th>Fode</th>
-                    <th>Tva</th>
-                    <th>Timbre Fiscal</th>
-                    <th>Net a Payer</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td><center>{invoiceData.totalHT}</center></td>
-                    <td><center>{invoiceData.remuneration}</center></td>
-                    <td><center>{invoiceData.netHT}</center></td>
-                    <td><center>{invoiceData.fode}</center></td>
-                    <td><center>{invoiceData.tva}</center></td>
-                    <td><center>{invoiceData.timbreFiscal}</center></td>
-                    <td><center>{invoiceData.netAPayer}</center></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div>
-              <table width="100%" style={{ marginTop: 50 }}>
-                <tbody>
-                  <tr>
-                    <td>
-                      Arretée la présente facture a la somme de :{netAPayerInFrench}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div>
-              <input type="button" value="Imprimer Et Enregistrer" onClick={handelPrintAndSave} />
-            </div>
-          </>
-        }
-
+      <div style={{ marginTop: '20px' }}>
+        {ModeUpdate ? <GetClient setClt={setClient} clt={factureFromLocation?.client} /> : <GetClient setClt={setClient} />}
       </div>
-    );
-  }
+      {(client.referance !== undefined || ModeUpdate) &&
+        <>
+          <div>
+            <table width="100%">
+              <tbody>
+                <tr>
+                  <td>
+                    <label htmlFor="date">Date:</label>{' '}
+                    {ModeUpdate ?
+                      <input
+                      type="date"
+                      name="date"
+                      min={dateMin}
+                      value={dateUpdateFacture(factureFromLocation?.DateFacture)}
+                      disabled={ModeUpdate}
+                    />
+                      :
+                      <input
+                      type="date"
+                      name="date"
+                      min={dateMin}
+                      defaultValue={dateMin}
+                      onChange={(e) => setDateMin(e.target.value)}
+                      disabled={ModeUpdate}
+                    />
+                  }
+                  </td>
+                  <td>
+                    <label htmlFor="nbc">N°BC:</label>{' '}
+                    <input type="text" name="nbc" />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div>
+            {ModeUpdate ? <FacArticles setArtcl={setArticles} artcl={factureFromLocation?.articles} /> : <FacArticles setArtcl={setArticles} />}
+          </div>
+          <div style={{ marginTop: 50 }}>
+            <table width='100%' border={1}>
+              <thead>
+                <tr>
+                  <th>Total HT </th>
+                  <th>Rem</th>
+                  <th>Net HT</th>
+                  <th>Fode</th>
+                  <th>Tva</th>
+                  <th>Timbre Fiscal</th>
+                  <th>Net a Payer</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><center>{invoiceData.totalHT}</center></td>
+                  <td><center>{invoiceData.remuneration}</center></td>
+                  <td><center>{invoiceData.netHT}</center></td>
+                  <td><center>{invoiceData.fode}</center></td>
+                  <td><center>{invoiceData.tva}</center></td>
+                  <td><center>{invoiceData.timbreFiscal}</center></td>
+                  <td><center>{invoiceData.netAPayer}</center></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <table width="100%" style={{ marginTop: 50 }}>
+              <tbody>
+                <tr>
+                  <td>
+                    Arretée la présente facture a la somme de :{netAPayerInFrench}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div>
+            {showArticleMessage && (
+              <div style={{ color: 'red', marginTop: '10px' }}>
+                Vous devez ajouter au moins un article.
+              </div>
+            )}
 
-  export default Facture;
+            <input type="button" value={(ModeUpdate?"Update ":'Enregistrer ')+"Et Imprimer"} onClick={handelPrintAndSave} />
+          </div>
+        </>
+      }
+
+    </div>
+  );
+}
+export default Facture;
 

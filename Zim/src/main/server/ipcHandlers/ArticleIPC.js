@@ -19,9 +19,9 @@ export function handleArticleIPC(mainWindow) {
 
 ipcMain.on('Article:add',async(event,ArticleToAdd)=> {
   try {
-    const { referance } = ArticleToAdd;
+    const { reference } = ArticleToAdd;
     // Check if an article with the same reference already exists
-    const existingArticle = await Article.findOne({ referance });
+    const existingArticle = await Article.findOne({ reference });
 
     if (existingArticle) {
         mainWindow.webContents.send("Article:add:ref?",{ message: "Article with the same reference already exists" });
@@ -35,9 +35,9 @@ ipcMain.on('Article:add',async(event,ArticleToAdd)=> {
 }
 })
 /*-------------------------------------- Delete Articles------------------------------------------*/
-ipcMain.on('Article:delete', async (event, referance) => {
+ipcMain.on('Article:delete', async (event, reference) => {
   try {
-    const deletedArticle = await Article.findOneAndDelete({ referance: referance });
+    const deletedArticle = await Article.findOneAndDelete({ reference: reference });
     if (!deletedArticle) {
       mainWindow.webContents.send("Delete:Article:ref?",{ message: "Article not found" });
     }
@@ -52,7 +52,7 @@ ipcMain.on('Article:delete', async (event, referance) => {
 ipcMain.on('Article:Update', async (event, article) => {
   try {
     const updatedArticle = await Article.findOneAndUpdate(
-      { referance: article.referance },
+      { reference: article.reference },
       { $set: article },
       { new: true }
     );
@@ -68,9 +68,9 @@ ipcMain.on('Article:Update', async (event, article) => {
 
 /*-------------------------------------- Get One Article-----------------------------------------*/
 
-ipcMain.on('Article:getOne', async (event, referance) => {
+ipcMain.on('Article:getOne', async (event, reference) => {
   try {
-    const article = await Article.findOne({ referance: referance });
+    const article = await Article.findOne({ reference: reference });
     if (!article) {
       mainWindow.webContents.send("Article:getOne:ref?",{ message: "Article not found" });
     }
@@ -78,7 +78,7 @@ ipcMain.on('Article:getOne', async (event, referance) => {
       ...article.toObject(),
       _id: article._id.toString(),
      };
-     console.log(articleToSend);
+    
      mainWindow.webContents.send('Article:getOne:succes', articleToSend);
 
 } catch (err) {

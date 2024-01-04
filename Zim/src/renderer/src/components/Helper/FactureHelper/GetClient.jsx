@@ -1,9 +1,9 @@
-import axios from 'axios';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
-function GetClient({ setClt }) {
+function GetClient({ setClt, clt }) {
+  const hasClient = clt !== undefined;
   const [client, setClient] = useState({
-    reference: '',
+    referance: '',
     name: '',
     matFisc: '',
     telephone: '',
@@ -11,15 +11,43 @@ function GetClient({ setClt }) {
     address: '',
     email: '',
   });
+  useEffect(() => {
+    if (hasClient) {
+      setClient({
+        referance: clt.referance,
+        name: clt.clientName,
+        matFisc: clt.MF,
+        telephone: clt.phoneNumber,
+        fax: clt.fax,
+        address: clt.address,
+        email: clt.email,
+        exonere: clt.exonere
+      });
+      setClt(clt)
+    } else {
+      setClient({
+        referance: '',
+        name: '',
+        matFisc: '',
+        telephone: '',
+        fax: '',
+        address: '',
+        email: '',
+      })
+    }
+  }, [hasClient,clt])
   const [errorMessage, setErrorMessage] = useState('');
 
-  const getTheClient = async (reference) => {
-    window.electron.ipcRenderer.send('Client:getOne', reference)
+  const getTheClient = async (referance) => {
+    window.electron.ipcRenderer.removeAllListeners("Client:getOne:succes")
+    window.electron.ipcRenderer.removeAllListeners("Client:getOne:ref?")
+    window.electron.ipcRenderer.removeAllListeners("Client:getOne:err")
+    window.electron.ipcRenderer.send('Client:getOne', referance)
     window.electron.ipcRenderer.on("Client:getOne:succes", (event, data) => {
       setClt(data)
       const { clientName, email, phoneNumber, address, MF, fax } = data;
       setClient({
-        reference: reference,
+        referance: referance,
         name: clientName,
         matFisc: MF,
         telephone: phoneNumber[0] || '',
@@ -33,9 +61,9 @@ function GetClient({ setClt }) {
       setErrorMessage('Client not found');
     })
     window.electron.ipcRenderer.on("Client:getOne:err", (event, data) => {
-      setErrorMessage(data.message);
+      setErrorMessage('Client not found');
       setClient({
-        reference: '',
+        referance: '',
         name: '',
         matFisc: '',
         telephone: '',
@@ -55,7 +83,7 @@ function GetClient({ setClt }) {
 
   const handleKeyPress = (event) => {
     if (event.key === 'Enter') {
-      getTheClient(client.reference);
+      getTheClient(client.referance);
     }
   };
 
@@ -66,13 +94,13 @@ function GetClient({ setClt }) {
           <tbody>
             <tr>
               <td>
-                <label htmlFor="reference">Reference Client:</label>
+                <label htmlFor="referance">Referance Client:</label>
               </td>
               <td>
                 <input
                   type="text"
-                  name="reference"
-                  value={client.reference}
+                  name="referance"
+                  value={client.referance}
                   onChange={handleClientChange}
                   onKeyPress={handleKeyPress}
                 />

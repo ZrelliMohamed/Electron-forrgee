@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import client from './client';
 
 const FactureSchema = new mongoose.Schema({
     Numero: { type: String },
