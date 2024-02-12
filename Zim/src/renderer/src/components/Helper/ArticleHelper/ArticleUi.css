@@ -1,0 +1,37 @@
+/* wordMenuStyles.css */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 500vh;
+}
+
+.menu {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  background-color: #f3f3f3; /* Light gray similar to Word */
+  padding: 10px;
+  border-bottom: 1px solid #ccc; /* Separator line */
+}
+
+.menu a {
+  text-decoration: none;
+  color: #444;
+  padding: 8px 15px;
+  border-bottom: 2px solid transparent; /* Default border */
+  transition: border-bottom 0.3s ease;
+}
+
+.menu a:hover {
+  border-bottom: 2px solid #2b5797; /* Microsoft Word menu item highlight color */
+}
+
+.content {
+  flex: 1;
+  padding: 0px;
+}
+
+.menu a.active {
+  border-bottom: 2px solid #2b5797; /* Microsoft Word menu item highlight color */
+}

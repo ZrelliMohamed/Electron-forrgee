@@ -1,6 +1,5 @@
-import axios from 'axios';
-import { useState} from 'react';
-
+import { useState } from 'react';
+import './checkbox.css'
 const AddClient = () => {
   const [newClient, setNewClient] = useState({
     clientName: '',
@@ -9,7 +8,6 @@ const AddClient = () => {
     address: '',
     MF: '',
     fax: '',
-    exonere: false, // Default value for exonere field
   });
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -49,18 +47,10 @@ const AddClient = () => {
     });
   };
 
-  const handleExonereChange = (e) => {
-    const { checked } = e.target;
-    setNewClient((prevClient) => ({
-      ...prevClient,
-      exonere: checked,
-    }));
-  };
-
   const handleAddClient = async (e) => {
-      e.preventDefault();
-      window.electron.ipcRenderer.send('Client:add', newClient)
-      window.electron.ipcRenderer.on('Client:succes', (event, data) => {
+    e.preventDefault();
+    window.electron.ipcRenderer.send('Client:add', newClient)
+    window.electron.ipcRenderer.on('Client:succes', (event, data) => {
       setSuccessMessage('Client successfully added.'); // Set success message
       setNewClient({ // Reset form inputs
         clientName: '',
@@ -69,18 +59,14 @@ const AddClient = () => {
         address: '',
         MF: '',
         fax: '',
-        exonere: false, // Reset exonere to default value
       });
-        })
-      // Add your logic for handling client addition here
-      window.electron.ipcRenderer.on('Client:failer', (event, data) => {
-        console.log(data);
-      })
+    })
+    // Add your logic for handling client addition here
+    window.electron.ipcRenderer.on('Client:failer', (event, data) => {
+      console.log(data);
+    })
 
   };
-
-
-
 
   return (
     <div>
@@ -129,28 +115,19 @@ const AddClient = () => {
             </tr>
             <tr>
               <td><label htmlFor="MF">MF:</label></td>
-              <td><input type="text" id="MF" name="MF" value={newClient.MF} onChange={handleInputChange}  required/></td>
+              <td><input type="text" id="MF" name="MF" value={newClient.MF} onChange={handleInputChange} required /></td>
             </tr>
             <tr>
               <td><label htmlFor="fax">Fax:</label></td>
               <td><input type="text" id="fax" name="fax" value={newClient.fax} onChange={handleInputChange} /></td>
             </tr>
             <tr>
-              <td><label htmlFor="exonere">Exonere:</label></td>
-              <td>
-                <input
-                  type="checkbox"
-                  id="exonere"
-                  name="exonere"
-                  checked={newClient.exonere}
-                  onChange={handleExonereChange}
-                />
-              </td>
-            </tr>
-            <tr>
               <td colSpan="2">
                 <center>
-                  <button type="submit" >Add Client</button>
+                  {/* <button type="submit" >Add Client</button> */}
+                  <button className="buttonPlus" type="submit">
+                    + Client
+                  </button>
                 </center>
               </td>
             </tr>

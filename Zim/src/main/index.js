@@ -6,6 +6,9 @@ import dataBase from './server/database/index'
 import { handleClientIPC } from './server/ipcHandlers/ClientIPC'
 import { handleArticleIPC} from './server/ipcHandlers/ArticleIPC'
 import { handleFactureIPC } from './server/ipcHandlers/FactureIPC'
+import { handleFournisseurIPC } from './server/ipcHandlers/FournisseurIPC'
+import { listOfClient } from './server/ipcHandlers/listOfClient'
+import { listOfFourn } from './server/ipcHandlers/listOfFourn'
 let mainWindow
 function createWindow() {
   // Create the browser window.
@@ -58,8 +61,9 @@ app.whenReady().then(async() => {
   handleClientIPC(mainWindow);
   handleArticleIPC(mainWindow);
   handleFactureIPC(mainWindow);
-
-
+  handleFournisseurIPC(mainWindow);
+  listOfClient(mainWindow,createNewOnglet)
+  listOfFourn(mainWindow,createNewOnglet)
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
@@ -78,3 +82,32 @@ app.on('window-all-closed', () => {
 
 
 
+function createNewOnglet(appToRender,width,height) {
+  // Create the browser window.
+let newWindow = new BrowserWindow({
+    width: width,
+    height: height,
+    show: false,
+    // autoHideMenuBar: true,
+    ...(process.platform === 'linux' ? { icon } : {}),
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      sandbox: false
+    }
+  })
+  newWindow.on('ready-to-show', () => {
+    newWindow.show()
+  })
+  newWindow.webContents.setWindowOpenHandler((details) => {
+    shell.openExternal(details.url)
+    return { action: 'deny' }
+  })
+  // HMR for renderer base on electron-vite cli.
+  // Load the remote URL for development or the local html file for production.
+  if (!app.isPackaged && process.env['ELECTRON_RENDERER_URL']) {
+    newWindow.loadURL(process.env['ELECTRON_RENDERER_URL']+'/'+appToRender)
+      } else {
+        newWindow.loadFile(path.join(__dirname, '../renderer/'+appToRender))
+      }
+      return newWindow
+}

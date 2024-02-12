@@ -1,19 +1,27 @@
-import { useEffect, useState } from 'react';
-import Client from '../Helper/ClientHelper/Client';
-function Clients() {
-  const [clients, setClients] = useState([]);
+import React,{ useEffect, useState } from 'react'
+import Fournisseur from './Fournisseur';
+
+function ListFourn() {
+  const [fourns, setFourns] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [reTogle, setReTogle] = useState(true);
-
   const togle =()=> {
     setReTogle(!reTogle)
   }
-
   const handleSearch = (event) => {
     setSearchTerm(event.target.value);
   };
 
-  const filteredClients = searchTerm.length === 0 ? clients : clients.filter((client) => {
+  useEffect(() => {
+    window.electron.ipcRenderer.send('Fourn:getAll', '')
+    window.electron.ipcRenderer.on('Fourn-reply', (event, data) => {
+      setFourns(data)
+    })
+    window.electron.ipcRenderer.on('Fourn-reply:err', (event, data) => {
+      console.log(data);
+    })
+  }, [reTogle]);
+  const filteredfourns = searchTerm.length === 0 ? fourns : fourns.filter((client) => {
     // Filter logic - checking for properties and searching if searchTerm is not empty
     const nameMatch = client.clientName && client.clientName.toLowerCase().includes(searchTerm.toLowerCase());
     const phoneMatch = client.phoneNumber && client.phoneNumber.toString().includes(searchTerm.toString());
@@ -25,18 +33,6 @@ function Clients() {
 
     return  referanceMatch || nameMatch || phoneMatch || addressMatch ||  MFMatch || emailMatch || faxMatch ;
   });
-
-  useEffect(() => {
-    window.electron.ipcRenderer.send('Client', 'getAll')
-    window.electron.ipcRenderer.on('Client-reply', (event, data) => {
-    setClients(data)
-    })
-    window.electron.ipcRenderer.on('Client-reply:err', (event, data) => {
-      console.log(data);
-    })
-  }, [reTogle]);
-
-
   return (
     <div>
       <div>
@@ -61,8 +57,8 @@ function Clients() {
              </tr>
            </thead>
   <tbody>
-          {filteredClients.map((client, i) => (
-            <Client key={i} client={client} i={i}  togle={togle}/>
+          {filteredfourns.map((fourn, i) => (
+            <Fournisseur key={i} fourn={fourn} i={i}  togle={togle}/>
           ))}
         </tbody>
         </table>
@@ -72,4 +68,4 @@ function Clients() {
   );
 }
 
-export default Clients;
+export default ListFourn

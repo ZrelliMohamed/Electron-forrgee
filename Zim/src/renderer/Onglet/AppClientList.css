@@ -1,0 +1,8 @@
+.client-table {
+  width: 100%;
+  border: 1px solid black;
+}
+
+.hovered-row {
+  background-color: #2b5797;
+}

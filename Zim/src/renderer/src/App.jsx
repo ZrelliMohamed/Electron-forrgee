@@ -1,21 +1,29 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, Outlet } from 'react-router-dom'
+import './App.css'
 function App() {
+  const [activeMenuItem, setActiveMenuItem] = useState(null);
 
-  return ( <div>
-    <div>
-      <h1>Zim Pour L'industrie Moderne</h1>
-      <Link to="Clients">Clients</Link> &nbsp;&nbsp;&nbsp;&nbsp;
-      <Link to="Articles">Articles</Link> &nbsp;&nbsp;&nbsp;&nbsp;
-      <Link to="Facture">Facture</Link> &nbsp;&nbsp;&nbsp;&nbsp;
-      <Link to="Setting">Setting</Link> &nbsp;&nbsp;&nbsp;&nbsp;
+  const handleMenuItemClick = (itemName) => {
+    setActiveMenuItem(itemName);
+  };
+  return (
+    <div className="container">
+      <div className="header">
+        <h1>Zrelli pour l'Industrie Moderne</h1>
+      </div>
 
-    </div>
-      <div >
-      <Outlet />
+      <div className="menu">
+        <Link to="Vente" className={activeMenuItem === 'Vente' ? 'active' : ''} onClick={() => handleMenuItemClick('Vente')}>Vente</Link>
+        <Link to="Achat" className={activeMenuItem === 'Achat' ? 'active' : ''} onClick={() => handleMenuItemClick('Achat')}>Achat</Link>
+        <Link to="Setting" className={activeMenuItem === 'Setting' ? 'active' : ''} onClick={() => handleMenuItemClick('Setting')}>Setting</Link>
+      </div>
+
+      <div className="content">
+        <Outlet />
       </div>
     </div>
-  )
+  );
 }
 
 export default App

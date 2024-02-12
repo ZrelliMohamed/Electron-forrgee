@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 
 function GetClient({ setClt, clt }) {
+
+
   const hasClient = clt !== undefined;
   const [client, setClient] = useState({
     referance: '',
@@ -11,6 +13,19 @@ function GetClient({ setClt, clt }) {
     address: '',
     email: '',
   });
+
+  window.electron.ipcRenderer.on("ChoosedClient", (event, data) => {
+    setClient({
+      referance: data.referance,
+      name: data.clientName,
+      matFisc: data.MF,
+      telephone: data.phoneNumber,
+      fax: data.fax,
+      address: data.address,
+      email: data.email,
+    });
+    setClt(data)
+  })
   useEffect(() => {
     if (hasClient) {
       setClient({
@@ -21,7 +36,6 @@ function GetClient({ setClt, clt }) {
         fax: clt.fax,
         address: clt.address,
         email: clt.email,
-        exonere: clt.exonere
       });
       setClt(clt)
     } else {
@@ -36,6 +50,11 @@ function GetClient({ setClt, clt }) {
       })
     }
   }, [hasClient,clt])
+  const handleKeyPress = (event) => {
+    if (event.key === 'Enter') {
+      getTheClient(client.referance);
+    }
+  };
   const [errorMessage, setErrorMessage] = useState('');
 
   const getTheClient = async (referance) => {
@@ -81,12 +100,6 @@ function GetClient({ setClt, clt }) {
     setClient((prevClient) => ({ ...prevClient, [name]: value }));
   };
 
-  const handleKeyPress = (event) => {
-    if (event.key === 'Enter') {
-      getTheClient(client.referance);
-    }
-  };
-
   return (
     <div style={{ display: 'flex' }}>
       <div style={{ flex: 1 }}>
@@ -103,7 +116,13 @@ function GetClient({ setClt, clt }) {
                   value={client.referance}
                   onChange={handleClientChange}
                   onKeyPress={handleKeyPress}
-                />
+                />&nbsp;
+                <input type="button" value="..." onClick={(e) => {
+                  window.electron.ipcRenderer.send('CreateClientList', '')
+                 }} />
+
+
+
               </td>
             </tr>
             <tr>

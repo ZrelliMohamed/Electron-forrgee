@@ -1,12 +1,39 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import img from '../../../assets/Zim.jpg'
 import { useLocation } from 'react-router-dom';
 function FacPrinter() {
+
+function dateFormat (date){
+  const dateParts = date.split('-');
+  const formattedDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+  return formattedDate
+}
+
+  const [setting, setSetting] = useState({
+    Tva: 0,
+    fodec: 0,
+    timbreFiscal: 0,
+  });
+  useEffect(() => {
+    fetchData();
+  }, [setting]);
+  const fetchData = () => {
+    window.electron.ipcRenderer.removeAllListeners('Facture:Setting-reply')
+    window.electron.ipcRenderer.removeAllListeners('Facture:Setting:err')
+    window.electron.ipcRenderer.send('Facture:Setting', 'Tva/fodec/timbreFiscal')
+    window.electron.ipcRenderer.on('Facture:Setting-reply', (event, data) => {
+      const { Tva, fodec, timbreFiscal } = data.documentToSend;
+      setSetting({ Tva, fodec, timbreFiscal });
+    })
+    window.electron.ipcRenderer.on('Facture:Setting:err', (event, data) => {
+      setError('Error fetching data: ' + data.message);
+    })
+  };
   const iframeRef = useRef(null);
   const location = useLocation();
-  const { articles, client, invoiceData, netAPayerInFrench, Nbc, nextFactureNumber, date } = location.state;  
+  const { articles, client, date, invoiceData, netAPayerInFrench, Nbc, dateBC, nextFactureNumber, exonere} = location.state;
   const handlePrint = async () => {
     const doc = new jsPDF();
     let yPos
@@ -15,16 +42,22 @@ function FacPrinter() {
       let startIndex = i * 20;
       let portion = articles.slice(startIndex, startIndex + 20);
       const imgData = await getImageData(img);
-      yPos = await addHeaderSection(doc, imgData, nextFactureNumber);
+      yPos = await addHeaderSection(doc, imgData, nextFactureNumber, date);
       yPos = renderClientInfo(doc, client, yPos);
-      yPos = await renderDateAndNbc(doc, date, Nbc, yPos);
+      yPos = await renderDateAndNbc(doc, dateBC, Nbc, yPos);
       yPos = await generateArticlesTable(doc, portion, yPos);
-      if (i === numIterations-1) {
-        yPos = addRemarkSection(doc, "Remarque:", yPos);
+      if (i === numIterations - 1) {
+        if (exonere.value) {
+          yPos = addRemarkSection(doc, `Facture émise en suspension de TVA suivant Attestation d'exonoération N° ${exonere.rules.attestation_num} du ${dateFormat(exonere.rules.date_Attes)} et Bon de Commande N° ${exonere.rules.BCN} du ${dateFormat(exonere.rules.date_BC)}
+TVA DUE : ${(invoiceData.netAPayer / 100 * setting.Tva).toFixed(3)}`, yPos, 170);
+        }
         yPos = addInvoiceDataTable(doc, invoiceData, yPos);
-        yPos = addNetAPayerSection(doc, netAPayerInFrench, yPos,'Arretée la présente facture a la somme de:');
+        yPos = addNetAPayerSection(doc, netAPayerInFrench, yPos, 'Arretée la présente facture a la somme de:');
       } else {
-        yPos = addRemarkSection(doc, "Remarque:", yPos);
+        if (exonere.value) {
+          yPos = addRemarkSection(doc, `Facture émise en suspension de TVA suivant Attestation d'exonoération N° ${exonere.rules.attestation_num} du ${dateFormat(exonere.rules.date_Attes)} et Bon de Commande N° ${exonere.rules.BCN} du ${dateFormat(exonere.rules.date_BC)}
+TVA DUE : ${(invoiceData.netAPayer / 100 * setting.Tva).toFixed(3)}`, yPos, 170);
+        }
         yPos = addInvoiceDataTable(doc, {
           totalHT: "",
           remuneration: "",
@@ -34,7 +67,7 @@ function FacPrinter() {
           timbreFiscal: "",
           netAPayer: ""
         }, yPos);
-        yPos = addNetAPayerSection(doc, '', yPos,'');
+        yPos = addNetAPayerSection(doc, '', yPos, '');
       }
       renderFooter(doc);
       if (i !== numIterations - 1) doc.addPage();
@@ -68,7 +101,7 @@ function FacPrinter() {
   useEffect(() => {
     handlePrint()
   }, [])
-  const addHeaderSection = async (doc, imgData, nextFactureNumber) => {
+  const addHeaderSection = async (doc, imgData, nextFactureNumber, date) => {
     // Set up initial y position for the table
     let yPos = 10;
 
@@ -94,11 +127,17 @@ function FacPrinter() {
 
     const centerXPos = (doc.internal.pageSize.width - invoiceTextWidth) / 2; // Calculate center position
     doc.text(invoiceText, centerXPos - 10, 17); // Centered text
+    // Add a new line under 'Facture N°:'
+    const additionalText = 'Date du: ' + dateFormat(date);
+    const additionalTextWidth = doc.getTextWidth(additionalText);
+    const additionalTextXPos = (doc.internal.pageSize.width - additionalTextWidth) / 2;
+    doc.text(additionalText, additionalTextXPos - 10, 22);
 
-    yPos += 22;
+    yPos += 20; // Adjust the vertical position accordingly
 
     return yPos; // Return the updated y position
   };
+
   function renderClientInfo(doc, client, yPos) {
     const clientInfoColumn1 = `Référence: ${client.referance || ''}\nClient: ${client.clientName || ''}\nMF: ${client.MF || ''}\nTéléphone: ${client.phoneNumber || ''}`;
     const clientInfoColumn2 = `Adresse: ${client.address || ''}\nFax: ${client.fax || ''}\nEmail: ${client.email || ''}`;
@@ -107,23 +146,21 @@ function FacPrinter() {
     doc.rect(10, yPos, 95, 20); // Rectangle for column 1
     doc.rect(105, yPos, 95, 20); // Rectangle for column 2
 
-    // Add text inside rectangles for client information
-    doc.setFontSize(12);
     doc.text(clientInfoColumn1, 13, yPos + 4); // First column
     doc.text(clientInfoColumn2, 107, yPos + 6); // Second column
 
     return yPos + 26; // Return updated yPos
   }
   const renderDateAndNbc = (doc, date, Nbc, yPos) => {
-    const dateParts = date.split('-');
-    const formattedDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+    console.log(date);
+    if (date !== '1970-1-1' && date !== null) {
+      const dateColumn = `Date: ${dateFormat(date)}`;
+      const nbcColumn = `Nbc: ${Nbc}`;
+      doc.setFontSize(12);
+      doc.text(dateColumn, 110, yPos);
+    }
+      Nbc?  doc.text(`Nbc: ${Nbc}`, 13, yPos) :""
 
-    const dateColumn = `Date: ${formattedDate}`;
-    const nbcColumn = `Nbc: ${Nbc}`;
-
-    doc.setFontSize(12);
-    doc.text(dateColumn, 13, yPos);
-    doc.text(nbcColumn, 110, yPos);
 
     return yPos + 5; // Update yPos and return for further adjustments
   };
@@ -170,18 +207,19 @@ function FacPrinter() {
 
 
 
-  function addRemarkSection(doc, remarkText, yPos) {
-    const remarkColumn = [remarkText];
+  function addRemarkSection(doc, remarkText, yPos, maxWidth ) {
+    const remarkColumn = doc.splitTextToSize(remarkText, maxWidth);
 
     doc.setFontSize(12);
     doc.text(remarkColumn, 13, yPos);
 
-    const remarkTextHeight = doc.getTextDimensions(remarkText).h;
+    const remarkTextHeight = remarkColumn.length * 2; // Assuming font size is 12
 
     yPos += remarkTextHeight + 7;
 
     return yPos; // Return the updated yPos value for further adjustments
   }
+
   function addInvoiceDataTable(doc, invoiceData, yPos) {
     const headersA = ["Total HT", 'Remise', 'Net HT', 'Fodec', "TVA", "Timbre Fiscal", 'Net a payer'];
 
@@ -202,7 +240,7 @@ function FacPrinter() {
     return yPos; // Return the updated yPos value
   }
 
-  function addNetAPayerSection(doc, netAPayerInFrench, yPos,str) {
+  function addNetAPayerSection(doc, netAPayerInFrench, yPos, str) {
     const rectX = 10;
     const rectY = yPos + 18;
     const rectWidthColumn1 = 140;

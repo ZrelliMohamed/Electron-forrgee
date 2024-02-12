@@ -97,10 +97,23 @@ export function handleFactureIPC(mainWindow) {
         // Create a custom date format
         const customDateFormat = `${year}-${month}-${day}`;
 
+
+             // Manipulate the date format
+             const date1 = new Date(facture.dateBC);
+
+             const year1 = date1.getFullYear();
+             const month1 = date1.getMonth() + 1; // Adding 1 because getMonth returns 0-11
+             const day1 = date1.getDate();
+
+             // Create a custom date format
+             const customDateFormat1 = `${year1}-${month1}-${day1}`;
+
+
         return {
           ...facture.toObject(),
           _id: factureIdAsString,
           DateFacture: customDateFormat, // Updated date format
+          dateBC:customDateFormat1,
           client: {
             ...clientDetails.toObject(),
             _id: clientIdAsString

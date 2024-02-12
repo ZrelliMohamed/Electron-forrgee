@@ -1,22 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import CustomConfirmDialog from './CustomConfirmDialog';
+import CustomConfirmDialog from '../ClientHelper/CustomConfirmDialog';
 import { useNavigate } from 'react-router-dom';
 
-function Client({ client, i, togle }) {
+function Fournisseur({ fourn, i, togle }) {
   const navigate = useNavigate();
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isDeleteButtonVisible, setIsDeleteButtonVisible] = useState(true);
-
   const handleDelete = async () => {
     setShowConfirmDialog(true); // Show confirmation dialog when attempting to delete
     setIsDeleteButtonVisible(false); // Hide the Delete button
   };
-
-  const handleUpdate = (cl) => { navigate('/Vente/Clients/Update', { state: { clientData: cl } }); };
+  const handleUpdate = (Frns) => { navigate('/Achat/FournisseurUI/UpdateFourn', { state: { fournData: Frns } }); };
 
   const handleConfirmation = async () => {
     // Perform delete logic only when confirmed
-    window.electron.ipcRenderer.send('Client:delete', client.referance)
+    window.electron.ipcRenderer.send('Client:delete', fourn.referance)
     window.electron.ipcRenderer.on('DeleteClient:succes', (event, data) => {
       togle();
       setShowConfirmDialog(false); // Close the confirmation dialog
@@ -28,27 +26,24 @@ function Client({ client, i, togle }) {
     window.electron.ipcRenderer.on('DeleteClient:err', (event, err) => {
       console.log(err);
     })
-
   };
-
-  const handleCancel = () => {
-    setShowConfirmDialog(false); // Close the confirmation dialog on cancellation
-    setIsDeleteButtonVisible(true); // Show the Delete button again
-  };
-
+     const handleCancel = () => {
+      setShowConfirmDialog(false); // Close the confirmation dialog on cancellation
+      setIsDeleteButtonVisible(true); // Show the Delete button again
+    };
   return (
     <tr key={i}  >
-      <td style={{ textAlign: 'center' }}>{String(client.referance).slice(0, 3)}&nbsp;{String(client.referance).slice(-3)}</td>
-      <td style={{ textAlign: 'center' }}>{client.clientName}</td>
-      <td style={{ textAlign: 'center' }}>{client.email}</td>
+      <td style={{ textAlign: 'center' }}>{String(fourn.referance).slice(0, 3)}&nbsp;{String(fourn.referance).slice(-3)}</td>
+      <td style={{ textAlign: 'center' }}>{fourn.clientName}</td>
+      <td style={{ textAlign: 'center' }}>{fourn.email}</td>
       <td style={{ textAlign: 'center' }}>
-        {client.phoneNumber.map((pn, i) => (
+        {fourn.phoneNumber.map((pn, i) => (
           <p key={i}>{pn}<br /></p>
         ))}
       </td>
-      <td style={{ textAlign: 'center' }}>{client.address}</td>
-      <td style={{ textAlign: 'center' }}>{client.MF}</td>
-      <td style={{ textAlign: 'center' }}>{client.fax}</td>
+      <td style={{ textAlign: 'center' }}>{fourn.address}</td>
+      <td style={{ textAlign: 'center' }}>{fourn.MF}</td>
+      <td style={{ textAlign: 'center' }}>{fourn.fax}</td>
       <td>
         {isDeleteButtonVisible && (
           <button onClick={handleDelete}>Delete</button>
@@ -62,10 +57,10 @@ function Client({ client, i, togle }) {
         )}
       </td>
       <td>
-        <input type='button' value='Update' onClick={() => handleUpdate(client)} />
+        <input type='button' value='Update' onClick={() => handleUpdate(fourn)} />
       </td>
     </tr>
   );
 }
 
-export default Client;
+export default Fournisseur

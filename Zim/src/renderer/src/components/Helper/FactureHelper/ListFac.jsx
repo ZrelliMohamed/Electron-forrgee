@@ -13,22 +13,38 @@ function ListFac() {
   const [filterCriteria, setFilterCriteria] = useState('Numero');
   const [showConfirmDialogForFacture, setShowConfirmDialogForFacture] = useState(null);
 
-  const getAll = async () => {
-        window.electron.ipcRenderer.send('Facture:GetAll', 'information')
-        window.electron.ipcRenderer.on('Facture:GetAll:succes', (event, data) => {
-          setFactures(data.factures);
-        })
-        window.electron.ipcRenderer.on('Facture:GetAll:err', (event, data) => {
-          console.log(data);
-        })
+  const getAll = () => {
+    return new Promise((resolve, reject) => {
+      window.electron.ipcRenderer.once('Facture:GetAll:succes', (event, data) => {
+        resolve(data.factures);
+      });
+
+      window.electron.ipcRenderer.once('Facture:GetAll:err', (event, data) => {
+        reject(new Error(data));
+      });
+
+      window.electron.ipcRenderer.send('Facture:GetAll', 'information');
+    });
   };
 
+  async function fetchDataCLient() {
+    try {
+      const factures = await getAll();
+      // Use factures here if the promise resolves
+      setFactures(factures);
+    } catch (error) {
+      // Handle errors if the promise rejects
+      console.error(error.message);
+      // Handle the error state in your application
+    }
+  }
+
   useEffect(() => {
-    getAll();
+    fetchDataCLient();
   }, [togle]);
 
   const handelPrinter = async (facture) => {
-    Navigate(`/Facture/PrintFac`, {
+    Navigate(`/Vente/Facture/PrintFac`, {
       state: {
         articles: facture.articles,
         client: facture.client,
@@ -36,6 +52,8 @@ function ListFac() {
         invoiceData: facture.totalcalcul,
         netAPayerInFrench: facture.netAPayer,
         Nbc: facture.Nbc,
+        dateBC:facture.dateBC,
+        exonere:facture.exonere,
         nextFactureNumber: facture.Numero,
       },
     });
@@ -145,10 +163,11 @@ function ListFac() {
                     />
                   )}
                 </td>
-                <td><input type="button" value="Update" onClick={()=>{
-                     Navigate(`/Facture/Fac`, {
-                      state: {facture},
-                    });
+                <td><input type="button" value="Update" onClick={() => {
+
+                  Navigate(`/Vente/Facture/Fac`, {
+                    state: { facture },
+                  });
                 }} /></td>
               </tr>
             ))

@@ -4,9 +4,10 @@ import { ipcMain } from 'electron';
 import Client from '../database/modules/client';
 export function handleClientIPC(mainWindow) {
  /*-------------------------------------- Get All CLient------------------------------------------*/
-ipcMain.on('Client', async (event, msg) => {
+ ipcMain.on('Client', async (event, msg) => {
   try {
-    const allClients = await Client.find({});
+    const clientType = 'Client'; // Define the type 'Client'
+    const allClients = await Client.find({ type: clientType });
 
     // Serialize the ObjectId fields in each document to strings
     const serializedClients = allClients.map(client => ({
@@ -19,18 +20,22 @@ ipcMain.on('Client', async (event, msg) => {
   }
 });
 
+
 /*-------------------------------------- Create one CLient------------------------------------------*/
 
-ipcMain.on('Client:add',async(event,clientToAdd)=> {
+ipcMain.on('Client:add', async (event, clientToAdd) => {
   try {
-    let cli = new Client(clientToAdd)
-    await cli.save();
-    mainWindow.webContents.send("Client:succes","client successfully added");
-  } catch (err) {
-    mainWindow.webContents.send("Client:failer",{ message: err.message });
-  }
+    // Add the 'type' property to the clientToAdd object
+    clientToAdd.type = 'Client'; // Set the type to 'Client'
 
-})
+    let cli = new Client(clientToAdd);
+    await cli.save();
+    mainWindow.webContents.send("Client:succes", "Client successfully added");
+  } catch (err) {
+    mainWindow.webContents.send("Client:failer", { message: err.message });
+  }
+});
+
 /*-------------------------------------- Delete CLient------------------------------------------*/
 
 
@@ -55,10 +60,8 @@ ipcMain.on('Client:Update', async (event, client) => {
       { new: true }
     );
     if (!updatedClient) {
-      // return res.status(404).json({ message: "Client not found" });
       mainWindow.webContents.send("UpdateClient:ref?",{ message: "Client not found" });
     }
-    // res.json({ message: "Client successfully updated", updatedClient });
     mainWindow.webContents.send("UpdateClient:succes",{ message: "Client successfully updated"});
   } catch (err) {
     mainWindow.webContents.send("UpdateClient:err",{ message: err.message});
@@ -70,24 +73,22 @@ ipcMain.on('Client:Update', async (event, client) => {
 
 ipcMain.on('Client:getOne', async (event, referance) => {
   try {
-    let oneClient = await Client.findOne({ referance: referance });
+    let oneClient = await Client.findOne({ referance: referance, type: 'Client' });
     if (!oneClient) {
-      mainWindow.webContents.send("Client:getOne:ref?",{ message: "Client not found" });
+      mainWindow.webContents.send("Client:getOne:ref?", { message: "Client not found" });
     }
-    oneClient._id=oneClient._id.toString()
-    const clientToSend = {
-      ...oneClient.toObject(),
-      _id: oneClient._id.toString(),
-  };
-    mainWindow.webContents.send("Client:getOne:succes",clientToSend);
+    if (oneClient) {
+      const clientToSend = {
+        ...oneClient.toObject(),
+        _id: oneClient._id.toString(),
+      };
+      mainWindow.webContents.send("Client:getOne:succes", clientToSend);
+    }
   } catch (err) {
-    mainWindow.webContents.send("Client:getOne:err",{ message: err.message });
+    mainWindow.webContents.send("Client:getOne:err", { message: err.message });
   }
+});
 
-
-
-
-})
 
 
 

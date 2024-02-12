@@ -1,11 +1,21 @@
-import React, { useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import GetClient from '../Helper/FactureHelper/GetClient';
 import FacArticles from '../Helper/FactureHelper/FacArticles';
 import img from '../../assets/Zim.jpg'
 import { useNavigate, useLocation } from 'react-router-dom';
 function Facture() {
+  const [exonore, setExonore] = useState(false);
+  const [rules, setRules] = useState({
+    attestation_num: 0,
+    date_Attes: null,
+    BCN: 0,
+    date_BC: null,
+  });
+
   const [ModeUpdate, setModeUpdate] = useState(false);
-  const [dateMin,setDateMin]=useState("2000-01-01")
+  const [dateMin, setDateMin] = useState("2000-01-01")
+  const [dateBC, setdateBC] = useState(null)
+  const [NumBC, setNumBC] = useState(null)
   const location = useLocation();
   const factureFromLocation = location.state ? location.state.facture : null;
   const [articles, setArticles] = useState([]);
@@ -24,8 +34,19 @@ function Facture() {
     } else {
       setModeUpdate(true);
     }
+    console.log('factureFromlocation',factureFromLocation);
   }, [factureFromLocation, ModeUpdate]);
-  const fetchData =() => {
+
+
+
+  useEffect(() => {
+    if(factureFromLocation?.Nbc && factureFromLocation?.dateBC){
+      setdateBC(factureFromLocation.dateBC)
+      setNumBC(factureFromLocation.Nbc)
+      }
+  }, [factureFromLocation]);
+
+  const fetchData = () => {
     window.electron.ipcRenderer.removeAllListeners('Facture:Setting-reply')
     window.electron.ipcRenderer.removeAllListeners('Facture:Setting:err')
     window.electron.ipcRenderer.send('Facture:Setting', 'Tva/fodec/timbreFiscal')
@@ -37,7 +58,7 @@ function Facture() {
       setError('Error fetching data: ' + data.message);
     })
   };
-  const getThelastDate =() => {
+  const getThelastDate = () => {
     window.electron.ipcRenderer.removeAllListeners('GetLastDate:succes')
     window.electron.ipcRenderer.send('GetLastDate', '')
     window.electron.ipcRenderer.on('GetLastDate:succes', (event, data) => {
@@ -142,9 +163,10 @@ function Facture() {
     return result;
   }
 
+
   useEffect(() => {
     calculateInvoiceData();
-  }, [articles,setting,client]);
+  }, [articles, setting, exonore]);
 
   const [invoiceData, setInvoiceData] = useState({
     totalHT: 0,
@@ -170,11 +192,13 @@ function Facture() {
     const netHT = totalHT - remuneration;
     var fodec = (netHT / 100) * setting.fodec;
     var tva = ((netHT + fodec) / 100) * setting.Tva;
+    var timbreFiscal=setting.timbreFiscal
     var netAPayer = 0
-    if (client.exonere) {
+    if (exonore || factureFromLocation?.exonere.value) {
       fodec = 0
       tva = 0
-      netAPayer = netHT + setting.timbreFiscal;
+      timbreFiscal=0
+      netAPayer = netHT ;
     } else {
       netAPayer = netHT + fodec + tva + setting.timbreFiscal;
     }
@@ -184,7 +208,7 @@ function Facture() {
       netHT: netHT.toFixed(3),
       fode: fodec.toFixed(3),
       tva: tva.toFixed(3),
-      timbreFiscal: setting.timbreFiscal.toFixed(3),
+      timbreFiscal: timbreFiscal.toFixed(3),
       netAPayer: netAPayer.toFixed(3),
     });
   };
@@ -205,29 +229,36 @@ function Facture() {
     const filteredArticles = articles.filter(article => {
       return article.reference !== ""
     });
-    if (filteredArticles.length > 0) {
+    if((exonore && rules.attestation_num !=0 &&  rules.date_Attes !== null &&  rules.BCN !==0 &&  rules.date_BC !== null) || exonore === false)
+    {
+      if (filteredArticles.length > 0) {
 
       if (!ModeUpdate) {
-    window.electron.ipcRenderer.removeAllListeners('Facture:create:succes')
-    window.electron.ipcRenderer.removeAllListeners('Facture:create:err')
+
+        window.electron.ipcRenderer.removeAllListeners('Facture:create:succes')
+        window.electron.ipcRenderer.removeAllListeners('Facture:create:err')
         window.electron.ipcRenderer.send('Facture:create', {
           DateFacture: dateMin,
-          Nbc: 0,
+          Nbc: NumBC,
+          dateBC: dateBC,
           articles: filteredArticles,
           totalcalcul: invoiceData,
           netAPayer: netAPayerInFrench,
-          client: client._id
+          client: client._id,
+          exonere: { value: exonore, rules: rules }
         })
         window.electron.ipcRenderer.on('Facture:create:succes', (event, data) => {
-          navigate(`/Facture/PrintFac`, {
+          navigate(`/Vente/Facture/PrintFac`, {
             state: {
               articles: articles,
-              client: {...client,referance:client.referance},
+              client: { ...client, referance: client.referance },
               date: dateMin,
               invoiceData: invoiceData,
               netAPayerInFrench: netAPayerInFrench,
-              Nbc: 0,
-              nextFactureNumber: nextFactureNumber
+              Nbc: NumBC,
+              dateBC: dateBC,
+              nextFactureNumber: nextFactureNumber,
+              exonere: { value: exonore, rules: rules }
             }
           })
         })
@@ -239,26 +270,44 @@ function Facture() {
         window.electron.ipcRenderer.removeAllListeners('Facture:Update:succes')
         window.electron.ipcRenderer.removeAllListeners('Facture:Update:ref?')
         window.electron.ipcRenderer.removeAllListeners('Facture:Update:err')
-        /*******************************************Updating********************************************** */
+        /*******************************************Updating**********************************************  dateBC
+NumBC */
+console.log("2",{
+  articles: filteredArticles,
+  _id: factureFromLocation._id,
+  DateFacture: factureFromLocation.DateFacture,
+  Nbc: NumBC !== factureFromLocation?.Nbc ?NumBC :factureFromLocation?.Nbc ,
+  dateBC: dateBC !== factureFromLocation?.dateBC ?dateBC:factureFromLocation?.dateBC,
+  totalcalcul: invoiceData,
+  netAPayer: netAPayerInFrench,
+  client: client._id,
+  exonere: { value: exonore, rules: rules }
+});
         window.electron.ipcRenderer.send('Facture:Update', {
+          articles: filteredArticles,
           _id: factureFromLocation._id,
           DateFacture: factureFromLocation.DateFacture,
-          Nbc: 0,
-          articles: filteredArticles,
+          Nbc: NumBC !== factureFromLocation?.Nbc ?NumBC :factureFromLocation?.Nbc ,
+          dateBC: dateBC !== factureFromLocation?.dateBC ?dateBC:factureFromLocation?.dateBC,
           totalcalcul: invoiceData,
           netAPayer: netAPayerInFrench,
-          client: client._id
+          client: client._id,
+          exonere: { value: exonore, rules: rules },
+
         })
         window.electron.ipcRenderer.on('Facture:Update:succes', (event, data) => {
-          navigate(`/Facture/PrintFac`, {
+          navigate(`/Vente/Facture/PrintFac`, {
             state: {
               articles: filteredArticles,
               client: client,
               date: factureFromLocation.DateFacture,
               invoiceData: invoiceData,
               netAPayerInFrench: netAPayerInFrench,
-              Nbc: 0,
-              nextFactureNumber: factureFromLocation.Numero
+              Nbc: NumBC !== factureFromLocation?.Nbc ?NumBC :factureFromLocation?.Nbc ,
+              dateBC: dateBC !== factureFromLocation?.dateBC ?dateBC:factureFromLocation?.dateBC,
+              nextFactureNumber: factureFromLocation.Numero,
+              exonere: { value: exonore, rules: rules },
+
             }
           })
           window.electron.ipcRenderer.on('Facture:Update:ref?' || 'Facture:Update:err', (event, data) => {
@@ -270,6 +319,10 @@ function Facture() {
     } else {
       setShowArticleMessage(true);
     }
+
+  }else {
+    setShowArticleMessage(true);
+  }
   }
   return (
     <div>
@@ -288,6 +341,27 @@ function Facture() {
             </td>
             <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}>
               <span style={{ fontSize: '24px' }}> {`Facture N°${ModeUpdate ? factureFromLocation?.Numero : nextFactureNumber}`}</span><br />
+              <span style={{ fontSize: '24px' }}>
+                <label htmlFor="date">Date Du :</label>{' '}
+                {ModeUpdate ?
+                  <input
+                    type="date"
+                    name="date"
+                    min={dateMin}
+                    defaultValue={dateUpdateFacture(factureFromLocation?.DateFacture)}
+                    disabled={ModeUpdate}
+                  />
+                  :
+                  <input
+                    type="date"
+                    name="date"
+                    min={dateMin}
+                    value={dateMin === "2000-01-01" ? "" : dateMin}
+                    onChange={(e) => setDateMin(e.target.value)}
+                    disabled={ModeUpdate}
+                  />
+                }
+              </span><br />
             </td>
             <td style={{ border: '1px solid black', padding: '10px', textAlign: 'center' }}></td>
           </tr>
@@ -300,37 +374,75 @@ function Facture() {
       {(client.referance !== undefined || ModeUpdate) &&
         <>
           <div>
-            <table width="100%">
+            <br />
+            <br />
+            <table width="100%" >
               <tbody>
-                <tr>
+                <tr >
                   <td>
-                    <label htmlFor="date">Date:</label>{' '}
-                    {ModeUpdate ?
-                      <input
-                      type="date"
-                      name="date"
-                      min={dateMin}
-                      value={dateUpdateFacture(factureFromLocation?.DateFacture)}
-                      disabled={ModeUpdate}
-                    />
-                      :
-                      <input
-                      type="date"
-                      name="date"
-                      min={dateMin}
-                      defaultValue={dateMin}
-                      onChange={(e) => setDateMin(e.target.value)}
-                      disabled={ModeUpdate}
-                    />
-                  }
+                    {ModeUpdate ? <>
+                      <label htmlFor="nbc">N°BC:</label>
+                      <input type="text" name="nbc"
+                        defaultValue={factureFromLocation?.Nbc}
+                        onChange={(e) => setNumBC(e.target.value)}
+
+                      /></>
+                      : <>
+                        <label htmlFor="nbc">N°BC:</label>
+                        <input type="text" name="nbc"
+                          onChange={(e) => setNumBC(e.target.value)}
+                        />
+                      </>
+                    }
                   </td>
                   <td>
-                    <label htmlFor="nbc">N°BC:</label>{' '}
-                    <input type="text" name="nbc" />
+                    {ModeUpdate ? <>
+                      <label htmlFor="date">Date BC:</label>{' '}
+                      <input
+                        type="date"
+                        name="date"
+                        defaultValue={factureFromLocation?.dateBC !== null ? dateUpdateFacture(factureFromLocation?.dateBC) : "jj/mm/aaaa"}
+                        onChange={(e) => setdateBC(e.target.value)}
+
+                      />
+                    </>
+                      : <>
+                        <label htmlFor="date">Date BC:</label>{' '}
+                        <input
+                          type="date"
+                          name="date"
+                          onChange={(e) => setdateBC(e.target.value)}
+                        />
+                      </>
+                    }
                   </td>
                 </tr>
               </tbody>
             </table>
+            <br />
+           {ModeUpdate?
+           factureFromLocation.exonere.value? " veuiller prendre en consideration que cette facture est exonore ✔" : " veuiller prendre en consideration que cette facture n'est pas exonore ✖"
+           :
+           <div>
+              <input type="button" value={`Exonore ${exonore ? "✔" : "✖"}`} style={{ marginLeft: 150 }} onClick={() => {
+                setExonore(!exonore)
+                setRules({
+                  attestation_num: 0,
+                  date_Attes: null,
+                  BCN: 0,
+                  date_BC: null,
+                })
+              }} /> &nbsp;&nbsp;&nbsp;
+              {exonore ? <>
+                <span>attestation d'exoneration N° :</span> <input type="text" onChange={(e) => { setRules({ ...rules, attestation_num: e.target.value }) }} />
+                du : <input type="date" onChange={(e) => { setRules({ ...rules, date_Attes: e.target.value }) }} />
+                BC N° :<input type="text" onChange={(e) => { setRules({ ...rules, BCN: e.target.value }) }} />
+                du : <input type="date" onChange={(e) => { setRules({ ...rules, date_BC: e.target.value }) }} /> </>
+                : ""
+              }
+            </div>}
+            <br />
+            <br />
           </div>
           <div>
             {ModeUpdate ? <FacArticles setArtcl={setArticles} artcl={factureFromLocation?.articles} /> : <FacArticles setArtcl={setArticles} />}
@@ -375,11 +487,11 @@ function Facture() {
           <div>
             {showArticleMessage && (
               <div style={{ color: 'red', marginTop: '10px' }}>
-                Vous devez ajouter au moins un article.
+                Veuiller completer la facture avoir la partie exonoration ou articles "la facture doit contenire au moins 1 articles".
               </div>
             )}
 
-            <input type="button" value={(ModeUpdate?"Update ":'Enregistrer ')+"Et Imprimer"} onClick={handelPrintAndSave} />
+            <input type="button" value={(ModeUpdate ? "Update " : 'Enregistrer ') + "Et Imprimer"} onClick={handelPrintAndSave} />
           </div>
         </>
       }

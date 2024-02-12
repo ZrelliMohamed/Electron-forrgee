@@ -10,7 +10,7 @@ function Article({ article, togle }) {
     setShowConfirmDialog(true); // Show confirmation dialog when attempting to delete
     setIsDeleteButtonVisible(false); // Hide the Delete button
   };
-  const handleUpdate = (artcl) => { navigate('/Articles/Update', { state: { articleData: artcl } }); };
+  const handleUpdate = (artcl) => { navigate('/Vente/Articles/Update', { state: { articleData: artcl } }); };
 
 
 
