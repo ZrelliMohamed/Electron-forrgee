@@ -194,8 +194,65 @@ export function handleFactureIPC(mainWindow) {
     }
   })
 
+/*-------------------------------------- Get Factures by Date Range ------------------------------------------*/
 
+ipcMain.on('Facture:GetByDateRange', async (event, { startDate, endDate }) => {
+    try {
+        let query = {};
 
+        // Only add date range to query if both start and end dates are provided
+        if (startDate && endDate) {
+            const startOfDay = new Date(startDate);
+            const endOfDay = new Date(endDate);
+            // Set the end date to the end of the day to ensure it's inclusive
+            endOfDay.setHours(23, 59, 59, 999);
+
+            query.DateFacture = {
+                $gte: startOfDay,
+                $lte: endOfDay
+            };
+        } else if (startDate) {
+            // If only a start date is provided, find all from that date onwards
+            const startOfDay = new Date(startDate);
+            query.DateFacture = { $gte: startOfDay };
+        } else if (endDate) {
+            // If only an end date is provided, find all up to that date
+            const endOfDay = new Date(endDate);
+            endOfDay.setHours(23, 59, 59, 999);
+            query.DateFacture = { $lte: endOfDay };
+        }
+
+        const facturesByDateRange = await Facture.find(query).populate('client');
+
+        const facturesToSend = facturesByDateRange.map(facture => {
+            const clientDetails = facture.client;
+            const factureIdAsString = facture._id.toString();
+            const clientIdAsString = clientDetails ? clientDetails._id.toString() : null;
+
+            // Format dates
+            const dateFacture = new Date(facture.DateFacture);
+            const formattedDateFacture = `${dateFacture.getFullYear()}-${dateFacture.getMonth() + 1}-${dateFacture.getDate()}`;
+            
+            const dateBC = facture.dateBC ? new Date(facture.dateBC) : null;
+            const formattedDateBC = dateBC ? `${dateBC.getFullYear()}-${dateBC.getMonth() + 1}-${dateBC.getDate()}` : null;
+
+            return {
+                ...facture.toObject(),
+                _id: factureIdAsString,
+                DateFacture: formattedDateFacture,
+                dateBC: formattedDateBC,
+                client: clientDetails ? {
+                    ...clientDetails.toObject(),
+                    _id: clientIdAsString
+                } : null
+            };
+        });
+
+        mainWindow.webContents.send('Facture:GetByDateRange-reply', { factures: facturesToSend });
+    } catch (err) {
+        mainWindow.webContents.send('Facture:GetByDateRange-err', { message: err.message });
+    }
+});
 
 
 
