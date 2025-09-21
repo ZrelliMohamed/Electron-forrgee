@@ -14,6 +14,7 @@ import FournisseurSituation from './modules/fournisseurs/FournisseurSituation.js
 // Factures → Vente
 import CreateFactureVente from './modules/factures/vente/CreateFactureVente.jsx';
 import FactureVenteList from './modules/factures/vente/FactureVenteList.jsx';
+import ModifierFactureVente from './modules/factures/vente/ModifierFactureVente.jsx';
 
 // Factures → Achat
 import CreateFactureAchat from './modules/factures/achat/CreateFactureAchat.jsx';
@@ -59,6 +60,7 @@ export default function App() {
               <Route index element={<Navigate to="/factures/vente/list" replace />} />
               <Route path="create" element={<CreateFactureVente />} />
               <Route path="list" element={<FactureVenteList />} />
+               <Route path="edit/:numero" element={<ModifierFactureVente />} /> 
               <Route path="PrintFac" element={<FacPrinter />} />
             </Route>
 

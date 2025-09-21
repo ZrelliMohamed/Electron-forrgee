@@ -1,24 +1,43 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import PdfPrinter from "./FactureVenteListHelper/PdfPrinter";
 
 export default function FactureVenteList() {
   const [factures, setFactures] = useState([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // Filtres
+  // Get the 'print' query param
+  const params = new URLSearchParams(location.search);
+  const printNumero = params.get("print");
+
+  function formatDateLocal(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  const currentYear = new Date().getFullYear();
+  const defaultStartDate = formatDateLocal(new Date(currentYear, 0, 1));
+  const defaultEndDate = formatDateLocal(new Date(currentYear, 11, 31));
+
   const [searchTerm, setSearchTerm] = useState("");
   const [minAmount, setMinAmount] = useState("");
   const [maxAmount, setMaxAmount] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [startDate, setStartDate] = useState(defaultStartDate);
+  const [endDate, setEndDate] = useState(defaultEndDate);
   const [isInfoPanelVisible, setIsInfoPanelVisible] = useState(false);
-  // Pagination
+
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 17;
+  const ITEMS_PER_PAGE = 15;
 
   // --- Fetch factures ---
   const getAll = () =>
     new Promise((resolve, reject) => {
+      window.electron.ipcRenderer.removeAllListeners("Facture:GetAll:succes");
+      window.electron.ipcRenderer.removeAllListeners("Facture:GetAll:err");
       window.electron.ipcRenderer.once("Facture:GetAll:succes", (event, data) => {
         resolve(data.factures);
       });
@@ -30,12 +49,20 @@ export default function FactureVenteList() {
 
   const getByDateRange = (dates) =>
     new Promise((resolve, reject) => {
-      window.electron.ipcRenderer.once("Facture:GetByDateRange-reply", (event, data) => {
-        resolve(data.factures);
-      });
-      window.electron.ipcRenderer.once("Facture:GetByDateRange-err", (event, data) => {
-        reject(new Error(data));
-      });
+      window.electron.ipcRenderer.removeAllListeners("Facture:GetByDateRange-reply");
+      window.electron.ipcRenderer.removeAllListeners("Facture:GetByDateRange-err");
+      window.electron.ipcRenderer.once(
+        "Facture:GetByDateRange-reply",
+        (event, data) => {
+          resolve(data.factures);
+        }
+      );
+      window.electron.ipcRenderer.once(
+        "Facture:GetByDateRange-err",
+        (event, data) => {
+          reject(new Error(data));
+        }
+      );
       window.electron.ipcRenderer.send("Facture:GetByDateRange", dates);
     });
 
@@ -57,11 +84,29 @@ export default function FactureVenteList() {
 
   useEffect(() => {
     fetchDataClient();
+    // Clean up listeners on unmount
+    return () => {
+      window.electron.ipcRenderer.removeAllListeners("Facture:GetAll:succes");
+      window.electron.ipcRenderer.removeAllListeners("Facture:GetAll:err");
+      window.electron.ipcRenderer.removeAllListeners("Facture:GetByDateRange-reply");
+      window.electron.ipcRenderer.removeAllListeners("Facture:GetByDateRange-err");
+    };
   }, [startDate, endDate]);
 
-  // --- Filtrage combiné ---
+  // ✅ Sort newest → oldest (by DateFacture, fallback Numero) ONCE
+  const sortedFactures = useMemo(() => {
+    return [...factures].sort((a, b) => {
+      const da = a?.DateFacture ? new Date(a.DateFacture) : new Date(0);
+      const db = b?.DateFacture ? new Date(b.DateFacture) : new Date(0);
+      if (db - da !== 0) return db - da; // descending by date
+      const na = String(a?.Numero ?? "");
+      const nb = String(b?.Numero ?? "");
+      return nb.localeCompare(na, undefined, { numeric: true, sensitivity: "base" }); // descending by numero
+    });
+  }, [factures]);
+
   const filteredFactures = useMemo(() => {
-    return factures.filter((facture) => {
+    return sortedFactures.filter((facture) => {
       const clientName = (facture.client?.clientName ?? "").toLowerCase();
       const numero = (facture.Numero ?? "").toLowerCase();
       const term = (searchTerm ?? "").toLowerCase();
@@ -74,9 +119,8 @@ export default function FactureVenteList() {
 
       return matchesText && matchesAmount;
     });
-  }, [factures, searchTerm, minAmount, maxAmount]);
+  }, [sortedFactures, searchTerm, minAmount, maxAmount]);
 
-  // --- Total Montant ---
   const totalMontant = useMemo(() => {
     return filteredFactures.reduce(
       (sum, f) => sum + Number(f.totalcalcul?.netAPayer ?? 0),
@@ -84,11 +128,9 @@ export default function FactureVenteList() {
     );
   }, [filteredFactures]);
 
-  // --- Description des filtres ---
   const filterDescription = useMemo(() => {
     const parts = [];
 
-    // Logic to handle one date selected
     let startDisplayDate = startDate;
     let endDisplayDate = endDate;
 
@@ -100,12 +142,14 @@ export default function FactureVenteList() {
     }
 
     if (startDate || endDate) {
-      const start = startDisplayDate === "début"
-        ? startDisplayDate
-        : new Date(startDisplayDate).toLocaleDateString("fr-FR");
-      const end = endDisplayDate === "Aujourd'hui"
-        ? endDisplayDate
-        : new Date(endDisplayDate).toLocaleDateString("fr-FR");
+      const start =
+        startDisplayDate === "début"
+          ? startDisplayDate
+          : new Date(startDisplayDate).toLocaleDateString("fr-FR");
+      const end =
+        endDisplayDate === "Aujourd'hui"
+          ? endDisplayDate
+          : new Date(endDisplayDate).toLocaleDateString("fr-FR");
       parts.push(`par date du ${start} au ${end}`);
     }
 
@@ -113,7 +157,6 @@ export default function FactureVenteList() {
       parts.push(`par client/numéro : "${searchTerm}"`);
     }
 
-    // New logic for min/max amount description
     if (minAmount && maxAmount) {
       parts.push(`par montant entre ${minAmount} DT et ${maxAmount} DT`);
     } else if (minAmount) {
@@ -125,9 +168,6 @@ export default function FactureVenteList() {
     return parts;
   }, [startDate, endDate, searchTerm, minAmount, maxAmount]);
 
-
-
-  // --- Paginated data ---
   const totalPages = Math.ceil(filteredFactures.length / ITEMS_PER_PAGE);
   const paginatedFactures = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -142,13 +182,11 @@ export default function FactureVenteList() {
   const selectedFacture =
     paginatedFactures.length > 0 ? paginatedFactures[selectedIndex] : null;
 
-  // Navigation in table
   const goPrev = () => selectedIndex > 0 && setSelectedIndex((i) => i - 1);
   const goNext = () =>
     selectedIndex < paginatedFactures.length - 1 &&
     setSelectedIndex((i) => i + 1);
 
-  // Pagination controls
   const goPage = (page) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
@@ -157,14 +195,38 @@ export default function FactureVenteList() {
   };
 
   const resetDates = () => {
-    setStartDate("");
-    setEndDate("");
+    setStartDate(defaultStartDate);
+    setEndDate(defaultEndDate);
   };
+
+  const handleEditFacture = (facture) => {
+    navigate(`/factures/vente/edit/${encodeURIComponent(facture.Numero)}`);
+  };
+
+  // Find the facture to print if printNumero is present
+  const [factureToPrint, setFactureToPrint] = useState(null);
+
+  useEffect(() => {
+    if (printNumero && sortedFactures.length > 0) {
+      const foundIndex = sortedFactures.findIndex(f => f.Numero === printNumero);
+      if (foundIndex !== -1) {
+        setFactureToPrint(sortedFactures[foundIndex]);
+        // Calculate the page where the facture is
+        const page = Math.floor(foundIndex / ITEMS_PER_PAGE) + 1;
+        setCurrentPage(page);
+        setSelectedIndex(foundIndex % ITEMS_PER_PAGE);
+        navigate(location.pathname, { replace: true });
+      }
+    } else {
+      setFactureToPrint(null);
+    }
+    // eslint-disable-next-line
+  }, [printNumero, sortedFactures]);
 
   return (
     <div className="flex gap-4 h-[calc(100vh-2rem)] p-4">
       {/* 📋 Liste + Filtres */}
-      <div className="w-1/3 overflow-auto border rounded-xl shadow bg-white">
+      <div className="w-2/5 overflow-auto border rounded-2xl shadow-soft bg-white">
         <div className="p-3 border-b bg-gray-50 text-sm text-gray-600">
           Recherchez par <span className="font-medium">client</span>,{" "}
           <span className="font-medium">numéro</span>,{" "}
@@ -229,6 +291,7 @@ export default function FactureVenteList() {
               <th className="px-4 py-2 text-center font-medium">Numéro</th>
               <th className="px-4 py-2 text-center font-medium">Date</th>
               <th className="px-4 py-2 text-center font-medium">Montant</th>
+              <th className="px-4 py-2 text-center font-medium">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -248,11 +311,41 @@ export default function FactureVenteList() {
                   <td className="px-4 py-2">
                     {facture.totalcalcul?.netAPayer} DT
                   </td>
+                  <td className="px-4 py-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditFacture(facture);
+                      }}
+                      className="px-3 py-1.5 text-sm bg-brand-500 text-white rounded-lg shadow-soft hover:bg-brand-600 transition"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width={24}
+                        height={24}
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="icon icon-tabler icons-tabler-outline icon-tabler-edit"
+                      >
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M7 7h-1a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-1" />
+                        <path d="M20.385 6.585a2.1 2.1 0 0 0 -2.97 -2.97l-8.415 8.385v3h3l8.385 -8.415z" />
+                        <path d="M16 5l3 3" />
+                      </svg>
+                    </button>
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="4" className="px-4 py-4 text-center text-gray-500">
+                <td
+                  colSpan="5"
+                  className="px-4 py-4 text-center text-gray-500"
+                >
                   Aucune facture trouvée.
                 </td>
               </tr>
@@ -264,12 +357,38 @@ export default function FactureVenteList() {
         {totalPages > 1 && (
           <div className="flex justify-center items-center gap-3 p-3 bg-gray-50 rounded-lg shadow mt-2">
             <button
+              onClick={() => goPage(1)}
+              disabled={currentPage === 1}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition ${
+                currentPage === 1
+                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                  : "bg-white text-gray-700 hover:bg-brand-100"
+              }`}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.25"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="lucide lucide-chevron-first-icon lucide-chevron-first"
+              >
+                <path d="m17 18-6-6 6-6" />
+                <path d="M7 6v12" />
+              </svg>
+            </button>
+            <button
               onClick={() => goPage(currentPage - 1)}
               disabled={currentPage === 1}
-              className={`px-3 py-1 rounded-md text-sm font-medium transition ${currentPage === 1
-                ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                : "bg-white text-gray-700 hover:bg-blue-100"
-                }`}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition ${
+                currentPage === 1
+                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                  : "bg-white text-gray-700 hover:bg-brand-100"
+              }`}
             >
               Prev
             </button>
@@ -280,12 +399,38 @@ export default function FactureVenteList() {
             <button
               onClick={() => goPage(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className={`px-3 py-1 rounded-md text-sm font-medium transition ${currentPage === totalPages
-                ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                : "bg-white text-gray-700 hover:bg-blue-100"
-                }`}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition ${
+                currentPage === totalPages
+                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                  : "bg-white text-gray-700 hover:bg-brand-100"
+              }`}
             >
               Next
+            </button>
+            <button
+              onClick={() => goPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition ${
+                currentPage === totalPages
+                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                  : "bg-white text-gray-700 hover:bg-brand-100"
+              }`}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.25"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="lucide lucide-chevron-last-icon lucide-chevron-last"
+              >
+                <path d="m7 18 6-6-6-6" />
+                <path d="M17 6v12" />
+              </svg>
             </button>
           </div>
         )}
@@ -293,16 +438,19 @@ export default function FactureVenteList() {
 
       {/* 🖨️ PDF + Navigation */}
       <div className="flex-1 flex flex-col">
-        {selectedFacture && (
+        {factureToPrint ? (
+          <PdfPrinter key={factureToPrint.Numero} factureToPrint={factureToPrint} />
+        ) : selectedFacture && (
           <>
             <div className="flex items-center justify-between mb-2">
               <button
                 onClick={goPrev}
                 disabled={selectedIndex === 0}
-                className={`px-3 py-1 rounded-lg text-sm shadow-sm ${selectedIndex === 0
-                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                  : "bg-brand-500 text-white hover:bg-brand-600"
-                  }`}
+                className={`px-3 py-1 rounded-lg text-sm shadow-sm ${
+                  selectedIndex === 0
+                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    : "bg-brand-500 text-white hover:bg-brand-600"
+                }`}
               >
                 ← Précédent
               </button>
@@ -316,11 +464,12 @@ export default function FactureVenteList() {
                   selectedIndex === paginatedFactures.length - 1 ||
                   paginatedFactures.length === 0
                 }
-                className={`px-3 py-1 rounded-lg text-sm shadow-sm ${selectedIndex === paginatedFactures.length - 1 ||
+                className={`px-3 py-1 rounded-lg text-sm shadow-sm ${
+                  selectedIndex === paginatedFactures.length - 1 ||
                   paginatedFactures.length === 0
-                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                  : "bg-brand-500 text-white hover:bg-brand-600"
-                  }`}
+                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    : "bg-brand-500 text-white hover:bg-brand-600"
+                }`}
               >
                 Suivant →
               </button>
@@ -332,52 +481,63 @@ export default function FactureVenteList() {
           </>
         )}
       </div>
-      {/* 💰 Info Total flottante - Maintenant au clic */}
+
+      {/* 💰 Info Total flottante */}
       <div className="fixed right-6 top-1/2 -translate-y-1/2 z-50 flex items-center">
-        <div className={`absolute right-0 top-1/2 -translate-y-1/2 w-80 bg-gray-900/80 backdrop-blur-md text-gray-200 rounded-xl shadow-xl p-6 transform transition-all duration-300 ease-out 
-          ${isInfoPanelVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}`}>
+        <div
+          className={`absolute right-0 top-1/2 -translate-y-1/2 w-80 bg-gray-900/80 backdrop-blur-md text-gray-200 rounded-2xl shadow-soft p-6 transform transition-all duration-300 ease-out
+           ${isInfoPanelVisible
+              ? "translate-x-0 opacity-100"
+              : "translate-x-full opacity-0"
+            }`}
+        >
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-bold text-white">Détails</h3>
-            <button onClick={() => setIsInfoPanelVisible(false)} className="text-gray-400 hover:text-white transition p-1 rounded-full hover:bg-gray-800">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-              </svg>
+            <button
+              onClick={() => setIsInfoPanelVisible(false)}
+              className="text-gray-400 hover:text-white transition p-1 rounded-full hover:bg-gray-800"
+            >
+              ✕
             </button>
           </div>
           <div className="flex flex-col gap-y-3 mb-4">
             <div className="flex items-center gap-x-3 bg-gray-800 p-4 rounded-lg">
-              <svg className="w-6 h-6 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-              </svg>
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-400">Factures affichées :</p>
-                <p className="text-xl font-bold text-white">{filteredFactures.length}</p>
+                <p className="text-sm font-medium text-gray-400">
+                  Factures affichées :
+                </p>
+                <p className="text-xl font-bold text-white">
+                  {filteredFactures.length}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-x-3 bg-gray-800 p-4 rounded-lg">
-              <svg className="w-6 h-6 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8c-1.11 0-2.08-.402-2.599-1M12 8a3 3 0 00-3-3m0 0a3 3 0 00-3 3v11a3 3 0 003 3h14a3 3 0 003-3V8a3 3 0 00-3-3m-9 0a3 3 0 013-3m-9 3l2.257 4.513M21 8l-2.257 4.513M9 16l-2.257 4.513M21 16l-2.257 4.513m-16.146-8.59l4.444-2.222m-16.146 8.59l4.444 2.222m16.146-8.59l-4.444-2.222m16.146 8.59l-4.444 2.222"></path>
-              </svg>
               <div className="flex-1">
                 <p className="text-sm font-medium text-gray-400">Total :</p>
-                <p className="text-xl font-bold text-white">{totalMontant.toLocaleString()} DT</p>
+                <p className="text-xl font-bold text-white">
+                  {totalMontant.toLocaleString()} DT
+                </p>
               </div>
             </div>
           </div>
           <hr className="my-4 border-t border-gray-700" />
-          {/* Description des filtres */}
           <div className="text-xs text-gray-400">
             <p className="font-medium text-gray-300 mb-2">Filtres appliqués :</p>
             {filterDescription.length > 0 ? (
               <div className="flex flex-wrap ">
                 {filterDescription.map((part, index) => (
-                  <span key={index} className=" text-gray-200  px-3 py-1 text-xs font-semibold ">
-                    •   {part.toLocaleUpperCase()}
+                  <span
+                    key={index}
+                    className=" text-gray-200  px-3 py-1 text-xs font-semibold "
+                  >
+                    • {part.toLocaleUpperCase()}
                   </span>
                 ))}
               </div>
             ) : (
-              <p className="text-sm">Aucun filtre appliqué</p>
+              <p className="text-sm">
+                Aucun filtre appliqué (Tous Les Facture )
+              </p>
             )}
           </div>
         </div>
@@ -386,12 +546,27 @@ export default function FactureVenteList() {
         <button
           onClick={() => setIsInfoPanelVisible(!isInfoPanelVisible)}
           className={`bg-brand-500 text-white p-4 rounded-full shadow-lg cursor-pointer transform transition-all duration-300
-            ${isInfoPanelVisible ? '-translate-x-80 rotate-180' : 'translate-x-0 rotate-0'}`}
+            ${isInfoPanelVisible ? "-translate-x-80 rotate-180" : "translate-x-0 rotate-0"}`}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-            stroke-linejoin="round" class="lucide lucide-qr-code-icon lucide-qr-code"><rect width="5" height="5" x="3" y="3" rx="1" /><rect width="5" height="5" x="16" y="3" rx="1" />
-            <rect width="5" height="5" x="3" y="16" rx="1" /><path d="M21 16h-3a2 2 0 0 0-2 2v3" /><path d="M21 21v.01" /><path d="M12 7v3a2 2 0 0 1-2 2H7" /><path d="M3 12h.01" />
-            <path d="M12 3h.01" /><path d="M12 16v.01" /><path d="M16 12h1" /><path d="M21 12v.01" /><path d="M12 21v-1" /></svg>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="lucide lucide-landmark-icon lucide-landmark"
+          >
+            <path d="M10 18v-7" />
+            <path d="M11.12 2.198a2 2 0 0 1 1.76.006l7.866 3.847c.476.233.31.949-.22.949H3.474c-.53 0-.695-.716-.22-.949z" />
+            <path d="M14 18v-7" />
+            <path d="M18 18v-7" />
+            <path d="M3 22h18" />
+            <path d="M6 18v-7" />
+          </svg>
         </button>
       </div>
     </div>

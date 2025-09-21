@@ -96,6 +96,6 @@ ipcMain.on('AskForDelete:openOnglet',async (event,msg)=> {
     console.log(error);
   }
 })
-
+ 
 
 }

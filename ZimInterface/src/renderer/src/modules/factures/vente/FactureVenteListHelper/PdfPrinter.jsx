@@ -76,14 +76,14 @@ function dateFormat (date){
     const doc = new jsPDF();
     let yPos = 10;
     const { articles, client, DateFacture, netAPayer, Nbc, dateBC, exonere, totalcalcul, Numero } = factureToPrint;
-    const numIterations = Math.ceil(articles.length / 20);
+    const numIterations = Math.ceil(articles.length / 19);
 
     const imgData = await getImageData(img);
 
     for (let i = 0; i < numIterations; i++) {
       if (i !== 0) doc.addPage();
-      const startIndex = i * 20;
-      const portion = articles.slice(startIndex, startIndex + 20);
+      const startIndex = i * 19;
+      const portion = articles.slice(startIndex, startIndex + 19);
       
       yPos = addHeaderSection(doc, imgData, Numero, DateFacture);
       yPos = renderClientInfo(doc, client, yPos);
@@ -195,7 +195,8 @@ const renderClientInfo = (doc, client, yPos) => {
 
   const generateArticlesTable = (doc, articles, yPos) => {
     const filteredArticles = articles.filter(article => article.reference !== "");
-    const rowsToShow = 19;
+   const rowsToShow =
+    factureToPrint?.exonere?.value ? 17 : 19; // 18 if exonerated, else 20
     const numberOfArticles = Math.min(filteredArticles.length, rowsToShow);
     const headers = ['Reference', 'Designation', 'Unité', 'Qté', 'PU HT', 'Prix HT', 'Remise %'];
     const data = new Array(rowsToShow).fill([]).map((_, index) => {

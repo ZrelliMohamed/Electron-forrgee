@@ -1,10 +1,18 @@
 import React, { useEffect, useState } from "react";
 
-function GetClient({ setClt }) {
-  const [client, setClient] = useState(null);
+function GetClient({ setClt, clt }) {
+  const [client, setClient] = useState(clt || null);
   const [errorMessage, setErrorMessage] = useState("");
 
-  // Écoute le choix d’un client depuis la fenêtre de sélection
+  // Update local client state when clt prop changes
+  useEffect(() => {
+    if (clt) {
+      setClient(clt);
+      setClt(clt);
+    }
+  }, [clt, setClt]);
+
+  // Listen for client selection from modal
   useEffect(() => {
     const handleChoosedClient = (event, data) => {
       setClient(data);

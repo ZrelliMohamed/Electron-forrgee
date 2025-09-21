@@ -9,6 +9,7 @@ import { handleFactureIPC } from './server/ipcHandlers/FactureIPC'
 import { handleFournisseurIPC } from './server/ipcHandlers/FournisseurIPC'
 import { listOfClient } from './server/ipcHandlers/listOfClient'
 import { listOfFourn } from './server/ipcHandlers/listOfFourn'
+import {listOfArticles} from './server/ipcHandlers/listOfArticles'
 let mainWindow
 function createWindow() {
   // Create the browser window.
@@ -65,6 +66,7 @@ app.whenReady().then(async() => {
   handleFournisseurIPC(mainWindow);
   listOfClient(mainWindow,createNewOnglet)
   listOfFourn(mainWindow,createNewOnglet)
+  listOfArticles(mainWindow,createNewOnglet)
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.

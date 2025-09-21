@@ -255,6 +255,30 @@ ipcMain.on('Facture:GetByDateRange', async (event, { startDate, endDate }) => {
 });
 
 
+/*-------------------------------------- Get One Factures  ------------------------------------------*/
+
+
+ipcMain.on('Facture:GetOne', async (event, numero) => {
+  try {
+    const facture = await Facture.findOne({ Numero: numero }).populate('client');
+    if (!facture) {
+      mainWindow.webContents.send('Facture:GetOne:err', { message: 'Facture not found' });
+      return;
+    }
+    // Convert facture and client to plain objects and stringify IDs
+    const factureObj = facture.toObject();
+    factureObj._id = factureObj._id.toString();
+    if (factureObj.client) {
+      factureObj.client = {
+        ...factureObj.client,
+        _id: factureObj.client._id.toString()
+      };
+    }
+    mainWindow.webContents.send('Facture:GetOne:succes', { facture: factureObj });
+  } catch (err) {
+    mainWindow.webContents.send('Facture:GetOne:err', { message: err.message });
+  }
+});
 
 
 
